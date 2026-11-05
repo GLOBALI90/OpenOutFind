@@ -26,17 +26,20 @@ PHONE_RE = re.compile(r"(?<!\w)(?:\+?\d[\d\s().-]{7,}\d)(?!\w)")
 DIESEL_TERMS = (
     "diesel", "gasoil", "gas oil", "diesel fuel", "diesel generator",
     "diesel-powered", "diesel powered", "fuel procurement",
+    "柴油", "柴油燃料", "燃料采购", "柴油采购",
+    "carburant diesel", "achat de gasoil", "combustível diesel",
+    "وقود الديزل", "شراء الديزل",
 )
 EXISTING_COMPANY_DOMAINS: set[str] = set()
 
 SECTOR_TERMS = {
-    "mining": ("mining", "mine operator", "mineral processing"),
-    "transport_logistics": ("trucking", "haulage", "logistics fleet", "transport fleet"),
-    "shipping_ports": ("shipping", "marine fleet", "port operator", "vessel"),
-    "construction": ("construction equipment", "earthmoving", "heavy equipment"),
-    "power_generation": ("power plant", "backup generator", "power generation"),
-    "cement_manufacturing": ("cement plant", "cement manufacturing", "industrial manufacturing"),
-    "agriculture": ("agricultural machinery", "farm equipment", "agriculture"),
+    "mining": ("mining", "mine operator", "mineral processing", "矿业", "矿山", "minière", "تعدين", "mineração"),
+    "transport_logistics": ("trucking", "haulage", "logistics fleet", "transport fleet", "物流", "运输车队", "flotte de camions", "أسطول النقل"),
+    "shipping_ports": ("shipping", "marine fleet", "port operator", "vessel", "港口", "航运", "ميناء", "portuaire"),
+    "construction": ("construction equipment", "earthmoving", "heavy equipment", "工程机械", "重型设备", "équipement lourd"),
+    "power_generation": ("power plant", "backup generator", "power generation", "发电厂", "发电", "محطة توليد الكهرباء", "centrale électrique"),
+    "cement_manufacturing": ("cement plant", "cement manufacturing", "industrial manufacturing", "水泥厂", "水泥制造", "cimenterie"),
+    "agriculture": ("agricultural machinery", "farm equipment", "agriculture", "农业机械", "machinerie agricole"),
 }
 CONTACT_PATH_HINTS = ("contact", "about", "company", "location", "procurement", "fuel")
 
@@ -285,6 +288,7 @@ def main() -> int:
     parser.add_argument("--market", default="China", choices=("China", "Africa"))
     parser.add_argument("--max-pages", type=int, default=5)
     parser.add_argument("--output", default="diesel_leads.jsonl")
+    parser.add_argument("--target-new", type=int, default=10, help="Stop after this many genuinely new companies; existing domains are skipped.")
     args = parser.parse_args()
     global EXISTING_COMPANY_DOMAINS
     EXISTING_COMPANY_DOMAINS = read_existing_company_domains()
@@ -296,13 +300,15 @@ def main() -> int:
             continue
         row = collect_company(seed, args.market, max(1, min(args.max_pages, 10)))
         if row:
-            row["record_status"] = (
-                "existing_company_refresh"
-                if row["website_domain"] in EXISTING_COMPANY_DOMAINS
-                else "new_company_candidate"
-            )
-            row["previously_in_leads"] = row["website_domain"] in EXISTING_COMPANY_DOMAINS
+            if row["website_domain"] in EXISTING_COMPANY_DOMAINS:
+                print(f"SKIP_EXISTING_DOMAIN domain={row['website_domain']}")
+                continue
+            row["record_status"] = "new_company_candidate"
+            row["previously_in_leads"] = False
             rows[row["lead_key"]] = row
+            if len(rows) >= max(1, args.target_new):
+                print(f"TARGET_REACHED new_candidates={len(rows)}")
+                break
     with Path(args.output).open("w", encoding="utf-8") as handle:
         for row in rows.values():
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
