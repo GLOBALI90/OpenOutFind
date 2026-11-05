@@ -151,9 +151,8 @@ def _send_email(row: dict, recipient: str) -> None:
 
 def _wuapi_account_id(api_key: str) -> str:
     _, result = _request_json("https://api.wuapi.dev/v1/accounts", token=api_key)
-    accounts = result.get("accounts") if isinstance(result, dict) else None
-    if accounts is None and isinstance(result, dict):
-        accounts = result.get("data")
+    # Wuapi's current AccountList schema returns the page under "items".
+    accounts = result.get("items") if isinstance(result, dict) else None
     if not isinstance(accounts, list):
         raise RuntimeError("Wuapi account list response was not in the documented format.")
     ready = [item for item in accounts if isinstance(item, dict) and str(item.get("status", "")).lower() == "ready" and item.get("id")]
@@ -229,6 +228,9 @@ def main() -> int:
             if prior not in {"sent", "queued", "sending"} and recipients:
                 recipient = recipients[0]
                 try:
+                    row["email_send_status"] = "sending"
+                    row["email_send_started_at_utc"] = now
+                    _save_row(row)
                     _send_email(row, recipient)
                     row["email_send_status"] = "sent"
                     row["email_sent_at_utc"] = now
@@ -252,6 +254,9 @@ def main() -> int:
                     continue
                 idem = hashlib.sha256(f"rozhan:{website}:whatsapp:{UTC_TODAY}".encode()).hexdigest()
                 try:
+                    row["whatsapp_send_status"] = "sending"
+                    row["whatsapp_send_started_at_utc"] = now
+                    _save_row(row)
                     _send_whatsapp(wa_key, wa_account, recipient, _message_text(row), idem)
                     row["whatsapp_send_status"] = "queued"
                     row["whatsapp_sent_at_utc"] = now
