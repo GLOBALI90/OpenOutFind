@@ -1,8 +1,7 @@
 """Discover fresh public company websites for diesel/gasoil buyer research.
 
 Uses Bing's public RSS search endpoint (no API key). It excludes domains already
-stored in Leads and domains persisted in the GitHub Actions cache, including sites
-checked in prior runs that did not qualify. No social login, private data, or
+stored in Leads and domains successfully fetched by the crawler in prior runs. No social login, private data, or
 outbound messaging is used.
 """
 from __future__ import annotations
@@ -132,16 +131,6 @@ def read_existing_domains() -> set[str]:
                 domains.add(domain)
     print(f"DISCOVERY_DEDUPE_LOADED leads_and_cached_domains={len(domains)}")
     return domains
-
-def save_discovery_history(urls: list[str]) -> None:
-    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    domains = set()
-    if STATE_FILE.exists():
-        domains.update(domain_key(line) for line in STATE_FILE.read_text(encoding="utf-8").splitlines())
-    domains.update(domain_key(url) for url in urls)
-    domains.discard("")
-    STATE_FILE.write_text("\n".join(sorted(domains)) + ("\n" if domains else ""), encoding="utf-8")
-    print(f"DISCOVERY_HISTORY_SAVED checked_domains={len(domains)} state_file={STATE_FILE}")
 
 def search_rss(query: str) -> list[str]:
     url = "https://www.bing.com/search?" + urllib.parse.urlencode({
