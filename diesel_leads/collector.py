@@ -1,8 +1,9 @@
-"""Permission-respecting first-stage diesel buyer collector.
+"""Permission-respecting diesel buyer collector.
 
-This pilot starts from explicitly supplied public company/directory URLs. It does
-not scrape search engines, Google Maps, LinkedIn, or Facebook. It obeys robots.txt,
-stays on each seed host, and never sends messages.
+Candidate company URLs are discovered at run time by scripts/discover_diesel_buyer_sites.py
+and may be supplemented with manually supplied public URLs. This crawler stays on
+each candidate host, obeys robots.txt, supports Chinese/French/Arabic fuel and sector
+terms, deduplicates against the Leads tab, and never sends messages.
 """
 from __future__ import annotations
 
