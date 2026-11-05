@@ -108,10 +108,12 @@ jobs:
       - name: Restore cached OpenStreetMap company website seeds
         uses: actions/cache@v4
         with:
-          path: .cache/osm_seeds_${{ env.MARKET }}.txt
-          key: osm-seeds-v1-${{ env.MARKET }}-${{ github.run_id }}
+          path: |
+            .cache/osm_seeds_China.txt
+            .cache/osm_seeds_Africa.txt
+          key: osm-seeds-v1-${{ github.run_id }}
           restore-keys: |
-            osm-seeds-v1-${{ env.MARKET }}-
+            osm-seeds-v1-
 
       - name: Discover fresh company websites from public web search
         env:
