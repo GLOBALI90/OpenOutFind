@@ -161,33 +161,45 @@ def _normalise_phone(raw: str) -> str:
     return value if len(re.sub(r"\D", "", value)) >= 8 else ""
 
 
-def _contact_data(text: str, links: list[str]) -> tuple[list[str], list[str], list[str], str]:
-    emails = sorted({e.lower() for e in EMAIL_RE.findall(text) if not e.lower().endswith((".png", ".jpg", ".webp"))})
-    phones = sorted({p for raw in PHONE_RE.findall(text) if (p := _normalise_phone(raw))})
+def _contact_data(text: str, links: list[str]) -> tuple[list[str], list[str], list[str], str, list[str]]:
+    email_values = set(EMAIL_RE.findall(text))
+    phone_values = set(PHONE_RE.findall(text))
     wa_numbers: set[str] = set()
-    wa_evidence: list[str] = []
+    wa_evidence: set[str] = set()
+
     for link in links:
-        absolute = urllib.parse.urljoin("https://placeholder.invalid", link)
+        absolute = urllib.parse.urljoin("https://placeholder.invalid", link.strip())
         parsed = urllib.parse.urlparse(absolute)
         host = (parsed.hostname or "").lower()
         query = urllib.parse.parse_qs(parsed.query)
+
+        if parsed.scheme.lower() == "mailto":
+            address = urllib.parse.unquote(parsed.path).split("?", 1)[0].strip()
+            if address:
+                email_values.add(address)
+        elif parsed.scheme.lower() == "tel":
+            phone_values.add(urllib.parse.unquote(parsed.path))
+
         raw = ""
         if host == "wa.me":
-            raw = parsed.path.strip("/")
-        elif host == "api.whatsapp.com" and parsed.path.startswith("/send"):
+            raw = parsed.path.strip("/").split("/", 1)[0]
+        elif host in {"api.whatsapp.com", "www.whatsapp.com", "whatsapp.com"} and parsed.path.startswith("/send"):
             raw = (query.get("phone") or [""])[0]
         if raw:
-            # WhatsApp click-to-chat paths contain international digits without a plus.
-            # Preserve E.164-style display for these explicitly verified numbers.
             normalised_raw = raw if raw.startswith(("+", "00")) else "+" + raw
             number = _normalise_phone(normalised_raw)
             if number:
                 wa_numbers.add(number)
-                wa_evidence.append(link)
-    # A phone is not labelled WhatsApp merely because a company has WhatsApp text.
-    # Only explicit WhatsApp click-to-chat links are verified in this pilot.
+                wa_evidence.add(link)
+
+    emails = sorted({
+        urllib.parse.unquote(e).strip().lower()
+        for e in email_values
+        if re.fullmatch(r"(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}", urllib.parse.unquote(e).strip())
+    })
+    phones = sorted({p for raw in phone_values if (p := _normalise_phone(raw))})
     status = "explicit_link" if wa_numbers else "not_verified"
-    return emails, phones, sorted(wa_numbers), status
+    return emails, phones, sorted(wa_numbers), status, sorted(wa_evidence)
 
 
 def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | None:
@@ -248,7 +260,7 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
         print(f"REJECT_NOT_RELEVANT domain={host} pages_fetched={len(source_urls)} diesel_hits=0 sector_hits=0")
         return None
 
-    emails, phones, whatsapp, wa_status = _contact_data(" ".join(all_text), all_links)
+    emails, phones, whatsapp, wa_status, wa_evidence = _contact_data(" ".join(all_text), all_links)
     direct = bool(diesel_hits)
     score = min(100, (65 if direct else 0) + min(25, 8 * len(sector_hits)) + (5 if emails else 0) + (5 if phones else 0))
     domain = host.removeprefix("www.")
@@ -290,6 +302,10 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
         "business_phones": phones,
         "whatsapp_numbers": whatsapp,
         "whatsapp_status": wa_status,
+        "whatsapp_evidence": wa_evidence,
+        "outreach_consent_status": "not_recorded",
+        "email_send_status": "not_sent",
+        "whatsapp_send_status": "not_sent",
         "contact_validation": "format_only_not_mailbox_verified" if emails else "not_found",
         "qualification_score": score,
         "source_urls": sorted(set(source_urls)),
