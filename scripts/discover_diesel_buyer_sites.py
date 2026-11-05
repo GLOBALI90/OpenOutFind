@@ -19,6 +19,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from urllib.parse import urlparse
 
+STATE_FILE = Path(".cache/diesel_discovery_domains.txt")
+
 USER_AGENT = "RozhanDieselBuyerResearch/1.0 (+public B2B company research)"
 BLOCKED_HOSTS = {
     "bing.com", "www.bing.com", "microsoft.com", "www.microsoft.com",
@@ -85,44 +87,31 @@ def read_existing_domains() -> set[str]:
     if not endpoint or not token:
         raise RuntimeError("Google Sheets bridge secrets are required for deduplication.")
     domains = set()
-    # Leads prevents duplicate prospects; DiscoveryLog prevents re-crawling sites
-    # that were already checked but did not qualify as a buyer.
-    for tab in ("Leads", "DiscoveryLog"):
-        for row in _read_tab(endpoint, token, tab):
-            for field in ("website", "discovered_url"):
-                domain = domain_key(str(row.get(field) or ""))
-                if domain:
-                    domains.add(domain)
-                    break
-    print(f"DISCOVERY_DEDUPE_LOADED leads_and_checked_domains={len(domains)}")
+    # Leads prevents duplicate prospects; the Actions cache prevents re-crawling
+    # domains checked in prior runs even when they did not qualify as buyers.
+    for row in _read_tab(endpoint, token, "Leads"):
+        for field in ("website", "discovered_url"):
+            domain = domain_key(str(row.get(field) or ""))
+            if domain:
+                domains.add(domain)
+                break
+    if STATE_FILE.exists():
+        for line in STATE_FILE.read_text(encoding="utf-8").splitlines():
+            domain = domain_key(line)
+            if domain:
+                domains.add(domain)
+    print(f"DISCOVERY_DEDUPE_LOADED leads_and_cached_domains={len(domains)}")
     return domains
 
-def write_discovery_log(urls: list[str], market: str) -> None:
-    if not urls:
-        return
-    endpoint = os.environ.get("GOOGLE_SHEETS_API_URL", "").strip()
-    token = os.environ.get("GOOGLE_SHEETS_API_TOKEN", "").strip()
-    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    rows = [
-        {"website": f"https://{domain_key(url)}", "market": market,
-         "discovered_at_utc": now, "search_provider": "Bing public RSS"}
-        for url in urls
-    ]
-    payload = {
-        "action": "upsert", "tab": "DiscoveryLog", "token": token,
-        "headers": ["website", "market", "discovered_at_utc", "search_provider"],
-        "rows": rows, "key_column": "website",
-    }
-    request = urllib.request.Request(
-        endpoint, data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=60) as response:
-        result = json.loads(response.read().decode("utf-8"))
-    if not isinstance(result, dict) or not result.get("ok"):
-        raise RuntimeError("Google Sheets rejected DiscoveryLog upsert; refusing to lose discovery history.")
-    print(f"DISCOVERY_LOG_SAVED rows={len(rows)} tab=DiscoveryLog")
+def save_discovery_history(urls: list[str]) -> None:
+    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    domains = set()
+    if STATE_FILE.exists():
+        domains.update(domain_key(line) for line in STATE_FILE.read_text(encoding="utf-8").splitlines())
+    domains.update(domain_key(url) for url in urls)
+    domains.discard("")
+    STATE_FILE.write_text("\n".join(sorted(domains)) + ("\n" if domains else ""), encoding="utf-8")
+    print(f"DISCOVERY_HISTORY_SAVED checked_domains={len(domains)} state_file={STATE_FILE}")
 
 def search_rss(query: str) -> list[str]:
     url = "https://www.bing.com/search?" + urllib.parse.urlencode({
@@ -184,7 +173,7 @@ def main() -> int:
 
     if failures == len(queries):
         raise RuntimeError("All public search queries failed; refusing to report a successful empty discovery run.")
-    write_discovery_log(fresh, args.market)
+    save_discovery_history(fresh)
     Path(args.output).write_text("\n".join(fresh) + ("\n" if fresh else ""), encoding="utf-8")
     print(f"DISCOVERY_COMPLETE market={args.market} queries={len(queries)} failed_queries={failures} fresh_domains={len(fresh)} output={args.output}")
     return 0
