@@ -1,4 +1,4 @@
-name: Diesel buyer research and outreach
+name: Diesel buyer research (collection-only pilot)
 
 on:
   workflow_dispatch:
@@ -24,14 +24,6 @@ on:
           - "5"
           - "8"
         default: "5"
-      outreach_mode:
-        description: "Draft outreach, or send one qualified business email (daily cap 3)"
-        required: true
-        type: choice
-        options:
-          - draft
-          - send
-        default: draft
 
 permissions:
   contents: read
@@ -41,7 +33,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  collect_and_outreach:
+  collect_only:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -53,17 +45,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install exporter dependency
-        run: python -m pip install requests
-
-      - name: Validate configuration and prepare seed list
+      - name: Validate Google Sheets configuration and seed list
         env:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
           SEED_URLS: ${{ inputs.seed_urls }}
-          OUTREACH_MODE: ${{ inputs.outreach_mode }}
-          GMAIL_USERNAME: ${{ secrets.GMAIL_USERNAME }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail
@@ -75,10 +61,6 @@ jobs:
           if ! grep -Eq '^https?://' diesel_seeds.txt; then
             echo "No valid http(s) seed URL was supplied."
             exit 1
-          fi
-          if [[ "${OUTREACH_MODE}" == "send" ]]; then
-            test -n "${GMAIL_USERNAME}" || { echo "Missing GMAIL_USERNAME repository secret."; exit 1; }
-            test -n "${GMAIL_APP_PASSWORD}" || { echo "Missing GMAIL_APP_PASSWORD repository secret."; exit 1; }
           fi
 
       - name: Read existing Leads and collect public company evidence
@@ -96,16 +78,17 @@ jobs:
         env:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
-        run: python scripts/export_diesel_buyers_to_sheets.py diesel_leads.jsonl
-
-      - name: Prepare or send qualified buyer outreach
-        env:
-          GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
-          GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
-          GMAIL_USERNAME: ${{ secrets.GMAIL_USERNAME }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: |
-          python scripts/diesel_outreach.py diesel_leads.jsonl \\
-            --mode "${{ inputs.outreach_mode }}" \\
-            --max-per-run 1 \\
-            --max-per-day 3
+          python -m pip install requests
+          python scripts/export_diesel_buyers_to_sheets.py diesel_leads.jsonl
+
+      - name: Upload collection report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diesel-buyer-collection-report
+          path: |
+            diesel_leads.jsonl
+            diesel_seeds.txt
+          if-no-files-found: ignore
+          retention-days: 14
