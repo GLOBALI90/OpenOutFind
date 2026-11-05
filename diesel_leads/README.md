@@ -9,7 +9,7 @@ This is an isolated, non-sending pilot inside the existing OpenOutFind repositor
 - Looks for explicit diesel/gasoil wording and separately records likely fuel-consuming sectors.
 - Extracts public business emails and phone numbers.
 - Marks WhatsApp only when the page contains an explicit `wa.me` or WhatsApp click-to-chat link. A phone number alone is never labelled WhatsApp.
-- Keeps source URLs, evidence terms, a conservative qualification score, and a stable company key.
+- Keeps source URLs, evidence terms, a conservative qualification score, and a stable company key derived from the normalized website domain. The Sheets bridge receives an `upsert` keyed by `lead_key`, so a company updates its existing row instead of creating a new row on every run. Repeated observations within one batch are merged; empty new fields do not erase non-empty observations in that batch.
 - Upserts into the separate Google Sheets tab `Diesel Buyers`, keyed by `lead_key`, so repeated runs update rather than duplicate a company.
 - Never sends email or WhatsApp messages.
 
