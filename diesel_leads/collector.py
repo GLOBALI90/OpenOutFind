@@ -126,7 +126,10 @@ def _contact_data(text: str, links: list[str]) -> tuple[list[str], list[str], li
         elif host == "api.whatsapp.com" and parsed.path.startswith("/send"):
             raw = (query.get("phone") or [""])[0]
         if raw:
-            number = _normalise_phone(raw)
+            # WhatsApp click-to-chat paths contain international digits without a plus.
+            # Preserve E.164-style display for these explicitly verified numbers.
+            normalised_raw = raw if raw.startswith(("+", "00")) else "+" + raw
+            number = _normalise_phone(normalised_raw)
             if number:
                 wa_numbers.add(number)
                 wa_evidence.append(link)
