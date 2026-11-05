@@ -41,7 +41,7 @@ def website_url(raw: str) -> str:
 
 
 def relevant(tags) -> bool:
-    pairs = {str(k).lower(): str(v).lower() for k, v in tags}
+    pairs = {str(tag.k).lower(): str(tag.v).lower() for tag in tags}
     combined = " ".join(f"{k}={v}" for k, v in pairs.items())
     keys = (
         "industrial=", "landuse=industrial", "man_made=works", "man_made=mine",
