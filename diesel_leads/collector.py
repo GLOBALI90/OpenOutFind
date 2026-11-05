@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import time
 import urllib.error
@@ -108,7 +109,7 @@ def read_existing_company_domains() -> set[str]:
     for row in result["rows"]:
         if not isinstance(row, dict):
             continue
-        for field in ("website", "discovered_url", "linkedin"):
+        for field in ("website", "discovered_url"):
             domain = _domain_key(str(row.get(field) or ""))
             if domain:
                 domains.add(domain)
