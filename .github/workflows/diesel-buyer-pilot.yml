@@ -53,11 +53,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "\${GOOGLE_SHEETS_API_URL}" || -z "\${GOOGLE_SHEETS_API_TOKEN}" ]]; then
+          if [[ -z "${GOOGLE_SHEETS_API_URL}" || -z "${GOOGLE_SHEETS_API_TOKEN}" ]]; then
             echo "Missing Google Sheets bridge secrets."
             exit 1
           fi
-          printf '%s\n' "\${SEED_URLS}" > diesel_seeds.txt
+          printf '%s\n' "${SEED_URLS}" > diesel_seeds.txt
           if ! grep -Eq '^https?://' diesel_seeds.txt; then
             echo "No valid http(s) seed URL was supplied."
             exit 1
