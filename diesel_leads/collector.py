@@ -26,6 +26,8 @@ DIESEL_TERMS = (
     "diesel", "gasoil", "gas oil", "diesel fuel", "diesel generator",
     "diesel-powered", "diesel powered", "fuel procurement",
 )
+EXISTING_COMPANY_DOMAINS: set[str] = set()
+
 SECTOR_TERMS = {
     "mining": ("mining", "mine operator", "mineral processing"),
     "transport_logistics": ("trucking", "haulage", "logistics fleet", "transport fleet"),
@@ -71,6 +73,47 @@ class PageParser(HTMLParser):
 def _public_http_url(url: str) -> bool:
     parsed = urllib.parse.urlparse(url)
     return parsed.scheme in {"http", "https"} and bool(parsed.hostname) and not parsed.username and not parsed.password
+
+
+def _domain_key(value: str) -> str:
+    candidate = value.strip()
+    if not candidate:
+        return ""
+    parsed = urllib.parse.urlparse(candidate if "://" in candidate else "//" + candidate)
+    host = (parsed.hostname or "").lower().removeprefix("www.")
+    return host
+
+
+def read_existing_company_domains() -> set[str]:
+    """Read the durable Leads tab before collection so known companies are recognised."""
+    endpoint = os.environ.get("GOOGLE_SHEETS_API_URL", "").strip()
+    token = os.environ.get("GOOGLE_SHEETS_API_TOKEN", "").strip()
+    if not endpoint or not token:
+        raise RuntimeError("Google Sheets bridge secrets are required before lead collection.")
+    payload = json.dumps({"action": "read", "tab": "Leads", "token": token}).encode("utf-8")
+    request = urllib.request.Request(
+        endpoint,
+        data=payload,
+        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except Exception as exc:
+        raise RuntimeError(f"Could not read existing Leads before collection: {type(exc).__name__}: {exc}") from exc
+    if not isinstance(result, dict) or not result.get("ok") or not isinstance(result.get("rows"), list):
+        raise RuntimeError("Google Sheets did not return a valid existing Leads table; refusing collection.")
+    domains: set[str] = set()
+    for row in result["rows"]:
+        if not isinstance(row, dict):
+            continue
+        for field in ("website", "discovered_url", "linkedin"):
+            domain = _domain_key(str(row.get(field) or ""))
+            if domain:
+                domains.add(domain)
+                break
+    return domains
 
 
 def _robots_parser(base_url: str) -> urllib.robotparser.RobotFileParser:
@@ -204,6 +247,16 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
         "website": f"{parsed_seed.scheme}://{parsed_seed.netloc}",
         "website_domain": domain,
         "market_search_bucket": market,
+        "lead_segment": "Diesel / Gasoil buyer research",
+        "product_interest": "Diesel / Gasoil",
+        "lead_source": "public_company_website_research",
+        "industry": ", ".join(sorted(sector_hits)),
+        "email": "; ".join(emails),
+        "phone": "; ".join(phones),
+        "whatsapp": "; ".join(whatsapp),
+        "evidence": "Diesel terms: " + ", ".join(diesel_hits) + "; sectors: " + ", ".join(sorted(sector_hits)),
+        "lead_score": score,
+        "collected_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "country": "",
         "city": "",
         "buyer_type": "direct_diesel_evidence" if direct else "sector_candidate_needs_confirmation",
@@ -228,6 +281,9 @@ def main() -> int:
     parser.add_argument("--max-pages", type=int, default=5)
     parser.add_argument("--output", default="diesel_leads.jsonl")
     args = parser.parse_args()
+    global EXISTING_COMPANY_DOMAINS
+    EXISTING_COMPANY_DOMAINS = read_existing_company_domains()
+    print(f"EXISTING_LEADS_READ count={len(EXISTING_COMPANY_DOMAINS)} tab=Leads")
     rows: dict[str, dict] = {}
     for line in Path(args.seeds).read_text(encoding="utf-8").splitlines():
         seed = line.strip()
@@ -235,11 +291,21 @@ def main() -> int:
             continue
         row = collect_company(seed, args.market, max(1, min(args.max_pages, 10)))
         if row:
+            row["record_status"] = (
+                "existing_company_refresh"
+                if row["website_domain"] in EXISTING_COMPANY_DOMAINS
+                else "new_company_candidate"
+            )
+            row["previously_in_leads"] = row["website_domain"] in EXISTING_COMPANY_DOMAINS
             rows[row["lead_key"]] = row
     with Path(args.output).open("w", encoding="utf-8") as handle:
         for row in rows.values():
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
-    print(f"Collected {len(rows)} candidate company record(s).")
+    existing_count = sum(1 for row in rows.values() if row.get("previously_in_leads"))
+    print(
+        f"Collected {len(rows)} unique company record(s): "
+        f"{len(rows) - existing_count} new candidate(s), {existing_count} existing company refresh(es)."
+    )
     return 0
 
 
