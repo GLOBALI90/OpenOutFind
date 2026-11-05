@@ -1,10 +1,10 @@
-name: Diesel buyer research — pilot
+name: Diesel buyer research and outreach
 
 on:
   workflow_dispatch:
     inputs:
       market:
-        description: "Market priority for this pilot batch"
+        description: "Market priority for this batch"
         required: true
         type: choice
         options:
@@ -24,6 +24,14 @@ on:
           - "5"
           - "8"
         default: "5"
+      outreach_mode:
+        description: "Draft outreach, or send one qualified business email (daily cap 3)"
+        required: true
+        type: choice
+        options:
+          - draft
+          - send
+        default: draft
 
 permissions:
   contents: read
@@ -33,9 +41,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  collect:
+  collect_and_outreach:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -53,6 +61,9 @@ jobs:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
           SEED_URLS: ${{ inputs.seed_urls }}
+          OUTREACH_MODE: ${{ inputs.outreach_mode }}
+          GMAIL_USERNAME: ${{ secrets.GMAIL_USERNAME }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail
@@ -60,10 +71,14 @@ jobs:
             echo "Missing Google Sheets bridge secrets."
             exit 1
           fi
-          printf '%s\n' "${SEED_URLS}" > diesel_seeds.txt
+          printf '%s\\n' "${SEED_URLS}" > diesel_seeds.txt
           if ! grep -Eq '^https?://' diesel_seeds.txt; then
             echo "No valid http(s) seed URL was supplied."
             exit 1
+          fi
+          if [[ "${OUTREACH_MODE}" == "send" ]]; then
+            test -n "${GMAIL_USERNAME}" || { echo "Missing GMAIL_USERNAME repository secret."; exit 1; }
+            test -n "${GMAIL_APP_PASSWORD}" || { echo "Missing GMAIL_APP_PASSWORD repository secret."; exit 1; }
           fi
 
       - name: Read existing Leads and collect public company evidence
@@ -71,10 +86,10 @@ jobs:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
         run: |
-          python diesel_leads/collector.py \
-            --seeds diesel_seeds.txt \
-            --market "${{ inputs.market }}" \
-            --max-pages "${{ inputs.max_pages_per_company }}" \
+          python diesel_leads/collector.py \\
+            --seeds diesel_seeds.txt \\
+            --market "${{ inputs.market }}" \\
+            --max-pages "${{ inputs.max_pages_per_company }}" \\
             --output diesel_leads.jsonl
 
       - name: Merge new evidence into existing Leads rows
@@ -83,3 +98,14 @@ jobs:
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
         run: python scripts/export_diesel_buyers_to_sheets.py diesel_leads.jsonl
 
+      - name: Prepare or send qualified buyer outreach
+        env:
+          GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
+          GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
+          GMAIL_USERNAME: ${{ secrets.GMAIL_USERNAME }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: |
+          python scripts/diesel_outreach.py diesel_leads.jsonl \\
+            --mode "${{ inputs.outreach_mode }}" \\
+            --max-per-run 1 \\
+            --max-per-day 3
