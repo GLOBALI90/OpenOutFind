@@ -111,6 +111,7 @@ jobs:
           path: |
             .cache/osm_seeds_China.txt
             .cache/osm_seeds_Africa.txt
+            .cache/osm_seed_domains.txt
           key: osm-seeds-v1-${{ github.run_id }}
           restore-keys: |
             osm-seeds-v1-
