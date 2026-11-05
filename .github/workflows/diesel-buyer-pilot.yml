@@ -66,7 +66,10 @@ jobs:
             exit 1
           fi
 
-      - name: Collect public company evidence
+      - name: Read existing Leads and collect public company evidence
+        env:
+          GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
+          GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
         run: |
           python diesel_leads/collector.py \
             --seeds diesel_seeds.txt \
@@ -74,7 +77,7 @@ jobs:
             --max-pages "${{ inputs.max_pages_per_company }}" \
             --output diesel_leads.jsonl
 
-      - name: Upsert into Google Sheets
+      - name: Merge new evidence into existing Leads rows
         env:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
