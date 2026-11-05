@@ -4,17 +4,16 @@ This is an isolated, non-sending pilot inside the existing OpenOutFind repositor
 
 ## What this pilot does
 
-- Reads the existing Google Sheets `Leads` table before collection, using the same Apps Script bridge `read` action as the previous collector.
-- Matches companies by normalized website domain and sends updates with `key_column=website`. The existing Apps Script bridge preserves non-empty old cells when incoming fields are blank.
-- Keeps the original company website value when a match is found, so older rows using `www` or a trailing slash still match.
-
+- Reads the existing `OpenOutFind` Google Sheets tab before collection, using the Apps Script bridge `read` action.
+- Matches companies by normalized website domain and sends updates with `key_column=website`. The bridge must preserve non-empty old cells when incoming fields are blank; this is the same merge behavior used by the earlier Rozhan Sheets bridge.
+- Keeps the original website value when a match is found, so older rows using `www` or a trailing slash still match.
 - Starts from public company or industry-directory URLs supplied to the manual GitHub Actions run.
 - Reads only public HTML pages on the same company host and checks `robots.txt` before each page.
 - Looks for explicit diesel/gasoil wording and separately records likely fuel-consuming sectors.
 - Extracts public business emails and phone numbers.
 - Marks WhatsApp only when the page contains an explicit `wa.me` or WhatsApp click-to-chat link. A phone number alone is never labelled WhatsApp.
-- Keeps source URLs, evidence terms, a conservative qualification score, and a stable company key derived from the normalized website domain. The Sheets bridge receives an `upsert` keyed by `lead_key`, so a company updates its existing row instead of creating a new row on every run. Repeated observations within one batch are merged; empty new fields do not erase non-empty observations in that batch.
-- Upserts into the existing Google Sheets tab `Leads`, keyed by `lead_key`, so repeated runs update rather than duplicate a company.
+- Keeps source URLs, evidence terms, a conservative qualification score, and a stable company key derived from the normalized website domain. Repeated observations within one batch are merged; empty new values do not erase non-empty values in the local merge.
+- Upserts new or refreshed records into the existing `OpenOutFind` tab, keyed by website, so the same company updates its existing row rather than creating another row.
 - Never sends email or WhatsApp messages.
 
 ## Important qualification rule
@@ -29,16 +28,16 @@ Email validation is format-only in this pilot; it does not prove that a mailbox 
 2. Choose China or Africa.
 3. Paste public company or industry-directory URLs, one per line.
 4. Choose the page limit and run.
-5. Review the `Leads` tab. The workflow does not publish lead files as public artifacts.
+5. Review the `OpenOutFind` tab.
 
-Required repository secrets (already used by the existing `Leads` bridge):
+Required repository secrets (already present in this repository):
 - `GOOGLE_SHEETS_API_URL`
 - `GOOGLE_SHEETS_API_TOKEN`
 
-These are the same Google Sheets bridge credentials already referenced by the existing manual OpenOutFind workflow. Do not paste tokens into source files, issues, or chat.
+Do not paste tokens into source files, issues, or chat.
 
 ## Deliberate first-stage limits
 
-This pilot does not scrape Google Maps, LinkedIn, Facebook, search-engine result pages, or sites requiring login. It does not yet perform broad automatic company discovery; the first run validates evidence extraction and the Sheets upsert with a small controlled URL list. After this passes, add permitted country-specific directories and source adapters, then test data quality before enabling a schedule.
+This pilot does not scrape Google Maps, LinkedIn, Facebook, search-engine result pages, or sites requiring login. It does not yet perform broad automatic company discovery; the first run validates evidence extraction and the Sheets read/upsert path with a small controlled URL list. After this passes, add permitted country-specific directories and source adapters, then test data quality before enabling a schedule.
 
 No daily target is guaranteed. A small number of well-evidenced buyers is more valuable than a large list of unverified companies.
