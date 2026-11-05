@@ -73,8 +73,10 @@ def extract_region(index: dict, region_id: str, out_dir: Path, handler) -> int:
     size_mb = local.stat().st_size / (1024 * 1024)
     print(f"OSM_DOWNLOAD_DONE region={region_id} size_mb={size_mb:.1f}")
     before = len(handler.urls)
-    handler.apply_file(str(local), locations=False)
-    local.unlink(missing_ok=True)
+    try:
+        handler.apply_file(str(local), locations=False)
+    finally:
+        local.unlink(missing_ok=True)
     count = len(handler.urls) - before
     print(f"OSM_REGION_PARSED region={region_id} new_websites={count}")
     return count
