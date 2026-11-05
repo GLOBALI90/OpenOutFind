@@ -1,4 +1,4 @@
-"""Read, merge and idempotently upsert diesel research into the existing OpenOutFind tab."""
+"""Read, merge and idempotently upsert diesel research into the existing Leads tab."""
 from __future__ import annotations
 
 import json
@@ -73,13 +73,13 @@ def _read_existing_leads(endpoint: str, token: str) -> list[dict[str, str]]:
     try:
         response = requests.post(
             endpoint,
-            json={"action": "read", "tab": "OpenOutFind", "token": token},
+            json={"action": "read", "tab": "Leads", "token": token},
             timeout=60,
         )
         response.raise_for_status()
         result = response.json()
     except (requests.RequestException, ValueError) as exc:
-        raise SystemExit(f"Could not read existing OpenOutFind before upsert: {type(exc).__name__}: {exc}") from exc
+        raise SystemExit(f"Could not read existing Leads before upsert: {type(exc).__name__}: {exc}") from exc
     if not isinstance(result, dict) or not result.get("ok") or not isinstance(result.get("rows"), list):
         raise SystemExit("Google Sheets returned an invalid Leads table; refusing a non-idempotent write.")
     return [row for row in result["rows"] if isinstance(row, dict)]
@@ -178,7 +178,7 @@ def main() -> int:
     rows = [{key: _scalar(row.get(key)) for key in headers} for row in merged_records]
     payload = {
         "action": "upsert",
-        "tab": "OpenOutFind",
+        "tab": "Leads",
         "token": token,
         "headers": headers,
         "rows": rows,
@@ -195,7 +195,7 @@ def main() -> int:
         raise SystemExit(f"Google Sheets rejected the upsert: {error}")
 
     print(
-        f"Google Sheets OpenOutFind upsert succeeded: new={new_count}, refreshed={update_count}, "
+        f"Google Sheets Leads upsert succeeded: new={new_count}, refreshed={update_count}, "
         f"submitted={len(merged_records)}, bridge_added={result.get('added')}, "
         f"bridge_merged={result.get('merged')}; key=website."
     )
