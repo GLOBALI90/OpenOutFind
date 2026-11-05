@@ -33,9 +33,9 @@ on:
         required: true
         type: choice
         options:
-          - "3"
           - "5"
-        default: "3"
+          - "7"
+        default: "5"
 
 permissions:
   contents: read
@@ -47,7 +47,7 @@ concurrency:
 jobs:
   collect_only:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -99,10 +99,19 @@ jobs:
       - name: Restore previously checked website domains
         uses: actions/cache@v4
         with:
-          path: .cache/diesel_discovery_domains.txt
-          key: diesel-buyer-discovery-${{ github.run_id }}
+          path: .cache/diesel_checked_domains_v2.txt
+          key: diesel-buyer-checked-v2-${{ github.run_id }}
           restore-keys: |
-            diesel-buyer-discovery-
+            diesel-buyer-checked-v2-
+
+
+      - name: Restore cached OpenStreetMap company website seeds
+        uses: actions/cache@v4
+        with:
+          path: .cache/osm_seeds_${{ env.MARKET }}.txt
+          key: osm-seeds-v1-${{ env.MARKET }}-${{ github.run_id }}
+          restore-keys: |
+            osm-seeds-v1-${{ env.MARKET }}-
 
       - name: Discover fresh company websites from public web search
         env:
@@ -110,9 +119,14 @@ jobs:
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
         run: |
           set -euo pipefail
-          python scripts/discover_diesel_buyer_sites.py --market "$MARKET" --limit 60 --output discovered_seeds.txt
+          python -m pip install osmium
+          python scripts/discover_diesel_buyer_sites.py --market "$MARKET" --limit 120 --output discovered_seeds.txt
+          python scripts/discover_osm_industrial_sites.py --market "$MARKET" --output osm_seeds.txt --cache-file ".cache/osm_seeds_$MARKET.txt" --max-age-days 7
           if [[ -s discovered_seeds.txt ]]; then
             cat discovered_seeds.txt >> diesel_seeds.txt
+          fi
+          if [[ -s osm_seeds.txt ]]; then
+            cat osm_seeds.txt >> diesel_seeds.txt
           fi
           if [[ -s manual_seeds.txt ]]; then
             cat manual_seeds.txt >> diesel_seeds.txt
@@ -125,7 +139,7 @@ jobs:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
         run: |
-          python diesel_leads/collector.py --seeds diesel_seeds.txt --market "$MARKET" --max-pages "${{ inputs.max_pages_per_company || '3' }}" --target-new "$TARGET_NEW" --output diesel_leads.jsonl
+          python diesel_leads/collector.py --seeds diesel_seeds.txt --market "$MARKET" --max-pages "${{ inputs.max_pages_per_company || '5' }}" --target-new "$TARGET_NEW" --output diesel_leads.jsonl
 
       - name: Merge new evidence into existing Leads rows
         env:
@@ -142,6 +156,7 @@ jobs:
           name: diesel-buyer-research-report
           path: |
             discovered_seeds.txt
+            osm_seeds.txt
             diesel_seeds.txt
             diesel_leads.jsonl
           if-no-files-found: ignore
