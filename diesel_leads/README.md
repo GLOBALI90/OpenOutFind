@@ -4,7 +4,7 @@ This is an isolated, non-sending pilot inside the existing OpenOutFind repositor
 
 ## What this pilot does
 
-- Reads the existing `OpenOutFind` Google Sheets tab before collection, using the Apps Script bridge `read` action.
+- Reads the existing `Leads` Google Sheets tab before collection, using the Apps Script bridge `read` action.
 - Matches companies by normalized website domain and sends updates with `key_column=website`. The bridge must preserve non-empty old cells when incoming fields are blank; this is the same merge behavior used by the earlier Rozhan Sheets bridge.
 - Keeps the original website value when a match is found, so older rows using `www` or a trailing slash still match.
 - Starts from public company or industry-directory URLs supplied to the manual GitHub Actions run.
@@ -13,7 +13,7 @@ This is an isolated, non-sending pilot inside the existing OpenOutFind repositor
 - Extracts public business emails and phone numbers.
 - Marks WhatsApp only when the page contains an explicit `wa.me` or WhatsApp click-to-chat link. A phone number alone is never labelled WhatsApp.
 - Keeps source URLs, evidence terms, a conservative qualification score, and a stable company key derived from the normalized website domain. Repeated observations within one batch are merged; empty new values do not erase non-empty values in the local merge.
-- Upserts new or refreshed records into the existing `OpenOutFind` tab, keyed by website, so the same company updates its existing row rather than creating another row.
+- Upserts new or refreshed records into the existing `Leads` tab, keyed by website, so the same company updates its existing row rather than creating another row.
 - Never sends email or WhatsApp messages.
 
 ## Important qualification rule
@@ -28,7 +28,7 @@ Email validation is format-only in this pilot; it does not prove that a mailbox 
 2. Choose China or Africa.
 3. Paste public company or industry-directory URLs, one per line.
 4. Choose the page limit and run.
-5. Review the `OpenOutFind` tab.
+5. Review the `Leads` tab.
 
 Required repository secrets (already present in this repository):
 - `GOOGLE_SHEETS_API_URL`
