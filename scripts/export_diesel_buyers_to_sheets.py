@@ -151,10 +151,12 @@ def main() -> int:
 
         merged: dict[str, object] = dict(previous)
         for field, value in record.items():
-            if field == "website" and previous.get("website"):
-                # Keep the exact existing key value so the Apps Script bridge matches
-                # the old row even if its stored URL contains www or a trailing slash.
-                merged[field] = previous["website"]
+            if field == "website" and previous:
+                # Keep the exact existing key value; when website was blank, use the
+                # old discovered_url because the bridge's Leads fallback key uses it.
+                merged[field] = previous.get("website") or previous.get("discovered_url") or value
+            elif field == "lead_id" and previous.get("lead_id"):
+                merged[field] = previous["lead_id"]
             elif field in LIST_FIELDS or field in DICT_FIELDS:
                 merged[field] = _merge_value(previous.get(field), value)
             elif value is not None and value != "" and value != [] and value != {}:
