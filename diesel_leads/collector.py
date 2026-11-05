@@ -32,6 +32,8 @@ DIESEL_TERMS = (
     "وقود الديزل", "شراء الديزل",
 )
 EXISTING_COMPANY_DOMAINS: set[str] = set()
+SUCCESSFULLY_FETCHED_DOMAINS: set[str] = set()
+CHECKED_DOMAINS_FILE = Path('.cache/diesel_checked_domains_v2.txt')
 
 SECTOR_TERMS = {
     "mining": ("mining", "mine operator", "mineral processing", "矿业", "矿山", "minière", "تعدين", "mineração"),
@@ -42,7 +44,7 @@ SECTOR_TERMS = {
     "cement_manufacturing": ("cement plant", "cement manufacturing", "industrial manufacturing", "水泥厂", "水泥制造", "cimenterie"),
     "agriculture": ("agricultural machinery", "farm equipment", "agriculture", "农业机械", "machinerie agricole"),
 }
-CONTACT_PATH_HINTS = ("contact", "about", "company", "location", "procurement", "fuel")
+CONTACT_PATH_HINTS = ("contact", "about", "company", "location", "procurement", "fuel", "fleet", "operations", "services", "projects", "facilities", "energy", "business")
 
 
 class PageParser(HTMLParser):
@@ -209,12 +211,15 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
         if (parsed.hostname or "").lower() != host:
             continue
         if not robots.can_fetch(USER_AGENT, url):
+            print(f"PAGE_BLOCKED_ROBOTS domain={host} path={parsed.path or '/'}")
             continue
         visited.add(url)
         result = _fetch(url)
         if result is None:
+            print(f"PAGE_FETCH_FAILED domain={host} path={parsed.path or '/'}")
             continue
         final_url, page = result
+        SUCCESSFULLY_FETCHED_DOMAINS.add(host.removeprefix('www.'))
         if (urllib.parse.urlparse(final_url).hostname or "").lower() != host:
             continue
         text = " ".join(page.parts)
@@ -239,6 +244,7 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
     }
     sector_hits = {k: v for k, v in sector_hits.items() if v}
     if not diesel_hits and not sector_hits:
+        print(f"REJECT_NOT_RELEVANT domain={host} pages_fetched={len(source_urls)} diesel_hits=0 sector_hits=0")
         return None
 
     emails, phones, whatsapp, wa_status = _contact_data(" ".join(all_text), all_links)
@@ -313,6 +319,13 @@ def main() -> int:
     with Path(args.output).open("w", encoding="utf-8") as handle:
         for row in rows.values():
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+    CHECKED_DOMAINS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    checked = set()
+    if CHECKED_DOMAINS_FILE.exists():
+        checked.update(line.strip() for line in CHECKED_DOMAINS_FILE.read_text(encoding="utf-8").splitlines() if line.strip())
+    checked.update(SUCCESSFULLY_FETCHED_DOMAINS)
+    CHECKED_DOMAINS_FILE.write_text("\n".join(sorted(checked)) + ("\n" if checked else ""), encoding="utf-8")
+    print(f"CRAWL_DIAGNOSTICS fetched_domains={len(SUCCESSFULLY_FETCHED_DOMAINS)} checked_domains_total={len(checked)}")
     existing_count = sum(1 for row in rows.values() if row.get("previously_in_leads"))
     print(
         f"Collected {len(rows)} unique company record(s): "
