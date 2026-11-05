@@ -17,12 +17,10 @@ from urllib.parse import urlparse
 INDEX_URL = "https://download.geofabrik.de/index-v1.json"
 REGIONS = {
     "China": [
-        "asia/china/guangdong", "asia/china/jiangsu", "asia/china/shandong",
-        "asia/china/zhejiang", "asia/china/hebei", "asia/china/inner-mongolia",
+        "guangdong", "jiangsu", "shandong", "zhejiang", "hebei", "inner-mongolia",
     ],
     "Africa": [
-        "africa/nigeria", "africa/south-africa", "africa/kenya",
-        "africa/ghana", "africa/zambia", "africa/tanzania",
+        "nigeria", "south-africa", "kenya", "ghana", "zambia", "tanzania",
     ],
 }
 USER_AGENT = "RozhanGlobalLeadResearch/1.0 (OSM extract processing)"
@@ -63,12 +61,10 @@ def extract_region(index: dict, region_id: str, out_dir: Path, handler) -> int:
         None,
     )
     if not feature:
-        print(f"OSM_REGION_MISSING id={region_id}")
-        return 0
+        raise RuntimeError(f"Geofabrik index has no region id={region_id}")
     pbf_url = feature.get("properties", {}).get("urls", {}).get("pbf")
     if not pbf_url:
-        print(f"OSM_PBF_URL_MISSING id={region_id}")
-        return 0
+        raise RuntimeError(f"Geofabrik index has no PBF URL for region id={region_id}")
     local = out_dir / (region_id.rsplit("/", 1)[-1] + ".osm.pbf")
     request = urllib.request.Request(pbf_url, headers={"User-Agent": USER_AGENT})
     print(f"OSM_DOWNLOAD_START region={region_id}")
