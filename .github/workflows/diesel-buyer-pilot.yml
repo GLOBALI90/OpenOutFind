@@ -96,6 +96,14 @@ jobs:
           printf '%s\n' "${MANUAL_SEEDS:-}" > manual_seeds.txt
           : > diesel_seeds.txt
 
+      - name: Restore previously checked website domains
+        uses: actions/cache@v4
+        with:
+          path: .cache/diesel_discovery_domains.txt
+          key: diesel-buyer-discovery-${{ github.run_id }}
+          restore-keys: |
+            diesel-buyer-discovery-
+
       - name: Discover fresh company websites from public web search
         env:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
