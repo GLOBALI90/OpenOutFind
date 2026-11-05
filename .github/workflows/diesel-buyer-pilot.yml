@@ -36,6 +36,16 @@ on:
           - "5"
           - "7"
         default: "5"
+      send_email:
+        description: "Send approved B2B emails (20/day max; requires email_outreach_eligible=TRUE)"
+        required: true
+        type: boolean
+        default: false
+      send_whatsapp:
+        description: "Send WhatsApp only to recorded opt-ins (5/day max; requires whatsapp_opt_in=TRUE)"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -151,6 +161,23 @@ jobs:
         run: |
           python -m pip install requests
           python scripts/export_diesel_buyers_to_sheets.py diesel_leads.jsonl
+
+      - name: Send approved outreach (manual runs only)
+        if: github.event_name == 'workflow_dispatch' && (inputs.send_email || inputs.send_whatsapp)
+        env:
+          SEND_EMAIL: ${{ inputs.send_email }}
+          SEND_WHATSAPP: ${{ inputs.send_whatsapp }}
+          GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
+          GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
+          GMAIL_USERNAME: ${{ secrets.GMAIL_USERNAME }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          WUAPI_API_KEY: ${{ secrets.WUAPI_API_KEY }}
+        run: |
+          set -euo pipefail
+          ARGS=()
+          if [[ "$SEND_EMAIL" == "true" ]]; then ARGS+=(--email); fi
+          if [[ "$SEND_WHATSAPP" == "true" ]]; then ARGS+=(--whatsapp); fi
+          python scripts/send_diesel_outreach.py "${ARGS[@]}"
 
       - name: Upload discovery and collection report
         if: always()
