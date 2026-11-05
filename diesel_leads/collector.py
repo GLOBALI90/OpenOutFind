@@ -244,6 +244,7 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
     key = hashlib.sha256(domain.encode("utf-8")).hexdigest()[:24]
     return {
         "lead_key": key,
+        "lead_id": key,
         "company_name": company_name,
         "website": f"{parsed_seed.scheme}://{parsed_seed.netloc}",
         "website_domain": domain,
