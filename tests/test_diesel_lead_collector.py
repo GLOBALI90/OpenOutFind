@@ -96,3 +96,17 @@ def test_sheets_export_deduplicates_and_merges_non_empty_observations():
         "https://example.com/fuel",
     ]
     assert rows[0]["qualification_score"] == 70
+
+
+def test_existing_company_domain_normalizes_www_and_paths():
+    from diesel_leads.collector import _domain_key
+
+    assert _domain_key("https://www.example.com/contact") == "example.com"
+    assert _domain_key("example.com/about") == "example.com"
+
+
+def test_empty_refresh_does_not_erase_old_contact_observations():
+    from scripts.export_diesel_buyers_to_sheets import _merge_value
+
+    assert _merge_value(["sales@example.com"], []) == ["sales@example.com"]
+    assert _merge_value({"mining": ["diesel"]}, {}) == {"mining": ["diesel"]}
