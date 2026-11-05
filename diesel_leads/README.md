@@ -25,7 +25,7 @@ Email validation is format-only in this pilot; it does not prove that a mailbox 
 2. Choose China or Africa.
 3. Paste public company or industry-directory URLs, one per line.
 4. Choose the page limit and run.
-5. Review the `Diesel Buyers` tab and the JSONL artifact.
+5. Review the `Diesel Buyers` tab. The workflow does not publish lead files as public artifacts.
 
 Required repository secrets:
 - `GOOGLE_SHEETS_API_URL`
