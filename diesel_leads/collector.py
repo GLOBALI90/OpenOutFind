@@ -195,7 +195,7 @@ def _contact_data(text: str, links: list[str]) -> tuple[list[str], list[str], li
     emails = sorted({
         urllib.parse.unquote(e).strip().lower()
         for e in email_values
-        if re.fullmatch(r"(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}", urllib.parse.unquote(e).strip())
+        if re.fullmatch(r"(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", urllib.parse.unquote(e).strip())
     })
     phones = sorted({p for raw in phone_values if (p := _normalise_phone(raw))})
     status = "explicit_link" if wa_numbers else "not_verified"
