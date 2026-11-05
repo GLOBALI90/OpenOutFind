@@ -167,6 +167,15 @@ def main() -> int:
         merged["last_seen_at_utc"] = collected_at
         merged["record_status"] = "existing_company_refresh" if previous else "new_company_candidate"
 
+        # Outreach eligibility is never inferred from a publicly discovered address or number.
+        # New rows start disabled; existing explicit approvals are preserved.
+        merged.setdefault("email_outreach_eligible", "FALSE")
+        merged.setdefault("whatsapp_opt_in", "FALSE")
+        merged.setdefault("do_not_contact", "FALSE")
+        merged.setdefault("unsubscribed", "FALSE")
+        merged.setdefault("email_send_status", "not_sent")
+        merged.setdefault("whatsapp_send_status", "not_sent")
+
         # Keep the legacy Leads columns populated for compatibility with existing views.
         merged["email"] = _merge_text(previous.get("email"), list(record.get("commercial_emails") or []))
         merged["phone"] = _merge_text(previous.get("phone"), list(record.get("business_phones") or []))
