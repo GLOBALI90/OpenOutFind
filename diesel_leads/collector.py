@@ -91,7 +91,7 @@ def read_existing_company_domains() -> set[str]:
     token = os.environ.get("GOOGLE_SHEETS_API_TOKEN", "").strip()
     if not endpoint or not token:
         raise RuntimeError("Google Sheets bridge secrets are required before lead collection.")
-    payload = json.dumps({"action": "read", "tab": "Leads", "token": token}).encode("utf-8")
+    payload = json.dumps({"action": "read", "tab": "OpenOutFind", "token": token}).encode("utf-8")
     request = urllib.request.Request(
         endpoint,
         data=payload,
@@ -102,9 +102,9 @@ def read_existing_company_domains() -> set[str]:
         with urllib.request.urlopen(request, timeout=60) as response:
             result = json.loads(response.read().decode("utf-8"))
     except Exception as exc:
-        raise RuntimeError(f"Could not read existing Leads before collection: {type(exc).__name__}: {exc}") from exc
+        raise RuntimeError(f"Could not read existing OpenOutFind before collection: {type(exc).__name__}: {exc}") from exc
     if not isinstance(result, dict) or not result.get("ok") or not isinstance(result.get("rows"), list):
-        raise RuntimeError("Google Sheets did not return a valid existing Leads table; refusing collection.")
+        raise RuntimeError("Google Sheets did not return a valid existing OpenOutFind table; refusing collection.")
     domains: set[str] = set()
     for row in result["rows"]:
         if not isinstance(row, dict):
@@ -284,7 +284,7 @@ def main() -> int:
     args = parser.parse_args()
     global EXISTING_COMPANY_DOMAINS
     EXISTING_COMPANY_DOMAINS = read_existing_company_domains()
-    print(f"EXISTING_LEADS_READ count={len(EXISTING_COMPANY_DOMAINS)} tab=Leads")
+    print(f"EXISTING_LEADS_READ count={len(EXISTING_COMPANY_DOMAINS)} tab=OpenOutFind")
     rows: dict[str, dict] = {}
     for line in Path(args.seeds).read_text(encoding="utf-8").splitlines():
         seed = line.strip()
