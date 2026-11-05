@@ -11,7 +11,7 @@ import requests
 
 
 LIST_FIELDS = {
-    "commercial_emails", "business_phones", "whatsapp_numbers",
+    "commercial_emails", "business_phones", "whatsapp_numbers", "whatsapp_evidence",
     "diesel_evidence_terms", "source_urls",
 }
 DICT_FIELDS = {"sector_evidence"}
