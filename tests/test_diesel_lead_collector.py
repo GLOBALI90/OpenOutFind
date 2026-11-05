@@ -67,3 +67,32 @@ def test_direct_diesel_evidence_is_separated_from_sector_only(monkeypatch):
     assert direct["buyer_type"] == "direct_diesel_evidence"
     assert sector["buyer_type"] == "sector_candidate_needs_confirmation"
     assert direct["qualification_score"] > sector["qualification_score"]
+
+
+def test_sheets_export_deduplicates_and_merges_non_empty_observations():
+    from scripts.export_diesel_buyers_to_sheets import _dedupe_records
+
+    rows = _dedupe_records([
+        {
+            "lead_key": "same-company",
+            "commercial_emails": ["sales@example.com"],
+            "business_phones": ["+12125550100"],
+            "source_urls": ["https://example.com/contact"],
+            "qualification_score": 65,
+        },
+        {
+            "lead_key": "same-company",
+            "commercial_emails": [],
+            "business_phones": ["+12125550101"],
+            "source_urls": ["https://example.com/fuel"],
+            "qualification_score": 70,
+        },
+    ])
+    assert len(rows) == 1
+    assert rows[0]["commercial_emails"] == ["sales@example.com"]
+    assert rows[0]["business_phones"] == ["+12125550100", "+12125550101"]
+    assert rows[0]["source_urls"] == [
+        "https://example.com/contact",
+        "https://example.com/fuel",
+    ]
+    assert rows[0]["qualification_score"] == 70
