@@ -19,7 +19,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from urllib.parse import urlparse
 
-STATE_FILE = Path(".cache/diesel_discovery_domains.txt")
+STATE_FILE = Path(".cache/diesel_checked_domains_v2.txt")
 
 USER_AGENT = "RozhanDieselBuyerResearch/1.0 (+public B2B company research)"
 BLOCKED_HOSTS = {
@@ -35,33 +35,63 @@ CHINA_QUERIES = [
     '"柴油采购" 物流 运输 企业 中国',
     '"柴油发电机" 电厂 企业 中国',
     '"燃料采购" 港口 航运 公司 中国',
-    'China mining company diesel fuel procurement official website',
-    'China logistics fleet diesel fuel transport company',
-    'China cement plant diesel generator fuel procurement',
-    'China port operator marine diesel fuel company',
-    'China construction heavy equipment diesel fleet company',
-    'China power generation company diesel generator operations',
-    'China industrial agriculture machinery diesel fleet',
-    'China gasoil buyer industrial company contact',
+    '"柴油" 水泥厂 采购 公司',
+    '"柴油" 工程机械 施工 企业',
+    '"柴油" 矿山 露天矿 运营商',
+    '"柴油" 工业园区 工厂 物流车队',
+    '"柴油" 港口 集装箱 运输 公司',
+    '"柴油" 发电厂 备用发电机 企业',
+    '"柴油" 农业机械 农场 企业',
+    '"柴油" 船舶 船队 航运 企业',
+    '"柴油" 钢铁厂 冶金 企业',
+    '"柴油" 化工厂 石化 企业',
+    '"柴油" 机场 地勤 车辆 运营',
+    '"柴油" 采石场 矿业 公司',
+    'China mining operator fleet fuel diesel official website',
+    'China quarry aggregate company heavy equipment fleet',
+    'China construction contractor earthmoving equipment fleet',
+    'China trucking company long haul fleet diesel',
+    'China logistics warehouse distribution fleet vehicles',
+    'China cement manufacturer plant operations company',
+    'China steel iron manufacturing plant industrial group',
+    'China power utility thermal plant backup generators',
+    'China port terminal operator container handling equipment',
+    'China shipping company marine vessel fleet operations',
+    'China industrial park manufacturing company fleet',
+    'China oilfield services drilling contractor equipment fleet',
+    'China agricultural enterprise farm machinery fleet',
+    'China public transport bus operator diesel fleet',
 ]
 
 AFRICA_QUERIES = [
     'Africa mining company diesel fuel procurement official website',
-    'Africa trucking logistics fleet diesel fuel buyer company',
-    'Africa port shipping marine diesel fuel procurement company',
-    'Africa cement plant diesel generator fuel procurement',
-    'Africa power generation diesel generator operator company',
-    'Africa construction heavy equipment diesel fleet company',
-    'South Africa mining diesel procurement company',
-    'Nigeria logistics fleet diesel fuel buyer company',
-    'Egypt cement power plant diesel fuel procurement',
-    'Kenya Tanzania mining transport diesel fuel company',
-    'Ghana Zambia Angola mining diesel fuel procurement',
-    'Morocco Algeria industrial diesel fuel buyer company',
-    'entreprise minière Afrique achat carburant diesel',
+    'Africa mine operator haul truck fleet company',
+    'Africa quarry aggregates cement heavy equipment operator',
+    'Africa trucking haulage logistics fleet company',
+    'Africa port terminal container handling operator',
+    'Africa shipping marine vessel fleet company',
+    'Africa cement manufacturer industrial plant operator',
+    'Africa steel manufacturing industrial company',
+    'Africa power generation diesel backup generator operator',
+    'Africa construction contractor earthmoving equipment fleet',
+    'Africa oilfield drilling services contractor fleet',
+    'Africa industrial agriculture commercial farm machinery',
+    'South Africa mining group fleet operations website',
+    'Nigeria mining quarry logistics diesel fleet company',
+    'Kenya Tanzania transport logistics fleet operator',
+    'Ghana Zambia copper gold mine operator fleet',
+    'Angola Mozambique mining port industrial company',
+    'Egypt Morocco cement steel power plant company',
+    'Namibia Botswana mining heavy equipment contractor',
+    'Senegal Ivory Coast industrial port logistics company',
+    'entreprise minière Afrique flotte engins carburant diesel',
     'société transport Afrique flotte camions achat gasoil',
-    'شركة تعدين في أفريقيا شراء وقود الديزل',
-    'empresa mineração África compra combustível diesel',
+    'entreprise cimenterie Afrique centrale électrique diesel',
+    'opérateur portuaire Afrique flotte équipements diesel',
+    'شركة تعدين في أفريقيا أسطول معدات وقود الديزل',
+    'شركة نقل ولوجستيات في أفريقيا أسطول شاحنات',
+    'empresa mineração África frota máquinas diesel',
+    'empresa transporte África frota caminhões combustível',
 ]
 
 def domain_key(value: str) -> str:
@@ -87,8 +117,8 @@ def read_existing_domains() -> set[str]:
     if not endpoint or not token:
         raise RuntimeError("Google Sheets bridge secrets are required for deduplication.")
     domains = set()
-    # Leads prevents duplicate prospects; the Actions cache prevents re-crawling
-    # domains checked in prior runs even when they did not qualify as buyers.
+    # Leads prevents duplicate prospects; only successfully crawled domains are cached.
+    # New candidates are not marked checked until the crawler fetches their pages.
     for row in _read_tab(endpoint, token, "Leads"):
         for field in ("website", "discovered_url"):
             domain = domain_key(str(row.get(field) or ""))
@@ -134,7 +164,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--market", choices=("China", "Africa"), required=True)
     parser.add_argument("--output", default="discovered_seeds.txt")
-    parser.add_argument("--limit", type=int, default=60)
+    parser.add_argument("--limit", type=int, default=120)
     args = parser.parse_args()
 
     existing = read_existing_domains()
@@ -173,7 +203,6 @@ def main() -> int:
 
     if failures == len(queries):
         raise RuntimeError("All public search queries failed; refusing to report a successful empty discovery run.")
-    save_discovery_history(fresh)
     Path(args.output).write_text("\n".join(fresh) + ("\n" if fresh else ""), encoding="utf-8")
     print(f"DISCOVERY_COMPLETE market={args.market} queries={len(queries)} failed_queries={failures} fresh_domains={len(fresh)} output={args.output}")
     return 0
