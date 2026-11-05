@@ -93,6 +93,28 @@ AFRICA_QUERIES = [
     'empresa transporte África frota caminhões combustível',
 ]
 
+
+# Curated discovery queries anchored to authoritative industry directories and registries.
+# These sources are used as public search indexes, not scraped behind interactive/login controls.
+SOURCE_QUERIES = {
+    "China": [
+        ("CCCME_industrial_directory", 'site:cccme.cn/suppliers China mining machinery construction machinery power generation company website'),
+        ("CCCME_industrial_directory", 'site:cccme.cn/suppliers China industrial equipment components metallurgy mineral energy transportation supplier'),
+        ("CCCME_industrial_directory", 'site:cccme.cn/suppliers China earthmoving machinery dump truck mine truck diesel forklift supplier'),
+        ("FIATA_logistics_directory", 'site:fiata.org/directory China freight forwarder logistics member company website'),
+        ("FIATA_logistics_directory", 'FIATA member China freight forwarding trucking logistics company fleet official website'),
+    ],
+    "Africa": [
+        ("official_mining_registry", 'site:mmmd.gov.zm mining licence holder company Zambia mining operator'),
+        ("official_mining_registry", 'site:portals.landfolio.com/Zambia mining company licence holder operator'),
+        ("official_mining_registry", 'site:dmpr.gov.za mining permit company South Africa mine operator'),
+        ("official_mining_registry", 'site:verification.dmpr.gov.za mining permit company South Africa'),
+        ("official_mining_registry", 'Africa mining cadastre licence holder company operator fleet diesel official website'),
+        ("FIATA_logistics_directory", 'site:fiata.org/directory Africa freight forwarder logistics member company website'),
+        ("FIATA_logistics_directory", 'FIATA member South Africa Nigeria Kenya Ghana Zambia Tanzania freight forwarding company website'),
+    ],
+}
+
 def domain_key(value: str) -> str:
     parsed = urlparse(value if "://" in value else "//" + value)
     return (parsed.hostname or "").lower().removeprefix("www.")
@@ -157,11 +179,14 @@ def main() -> int:
     args = parser.parse_args()
 
     existing = read_existing_domains()
-    queries = CHINA_QUERIES if args.market == "China" else AFRICA_QUERIES
+    base_queries = CHINA_QUERIES if args.market == "China" else AFRICA_QUERIES
+    source_queries = SOURCE_QUERIES[args.market]
+    query_items = [("general_public_web", q) for q in base_queries] + source_queries
+    print(f"SOURCE_QUERY_GROUPS market={args.market} general={len(base_queries)} curated={len(source_queries)}")
     fresh: list[str] = []
     seen: set[str] = set()
     failures = 0
-    for index, query in enumerate(queries, 1):
+    for index, (source_name, query) in enumerate(query_items, 1):
         try:
             urls = search_rss(query)
             added = 0
@@ -182,18 +207,18 @@ def main() -> int:
                 added += 1
                 if len(fresh) >= max(1, args.limit):
                     break
-            print(f"SEARCH_QUERY market={args.market} index={index}/{len(queries)} results={len(urls)} fresh_domains={added}")
+            print(f"SEARCH_QUERY market={args.market} source={source_name} index={index}/{len(query_items)} results={len(urls)} fresh_domains={added}")
         except (urllib.error.URLError, TimeoutError, ET.ParseError, ValueError) as exc:
             failures += 1
-            print(f"SEARCH_QUERY_FAILED market={args.market} index={index} error={type(exc).__name__}")
+            print(f"SEARCH_QUERY_FAILED market={args.market} source={source_name} index={index} error={type(exc).__name__}")
         if len(fresh) >= max(1, args.limit):
             break
         time.sleep(0.6)
 
-    if failures == len(queries):
+    if failures == len(query_items):
         raise RuntimeError("All public search queries failed; refusing to report a successful empty discovery run.")
     Path(args.output).write_text("\n".join(fresh) + ("\n" if fresh else ""), encoding="utf-8")
-    print(f"DISCOVERY_COMPLETE market={args.market} queries={len(queries)} failed_queries={failures} fresh_domains={len(fresh)} output={args.output}")
+    print(f"DISCOVERY_COMPLETE market={args.market} queries={len(query_items)} failed_queries={failures} fresh_domains={len(fresh)} output={args.output}")
     return 0
 
 if __name__ == "__main__":
