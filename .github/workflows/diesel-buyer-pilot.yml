@@ -47,9 +47,9 @@ jobs:
 
       - name: Validate Google Sheets configuration and seed list
         env:
-          GOOGLE_SHEETS_API_URL: \${{ secrets.GOOGLE_SHEETS_API_URL }}
-          GOOGLE_SHEETS_API_TOKEN: \${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
-          SEED_URLS: \${{ inputs.seed_urls }}
+          GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
+          GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
+          SEED_URLS: ${{ inputs.seed_urls }}
         shell: bash
         run: |
           set -euo pipefail
@@ -65,14 +65,14 @@ jobs:
 
       - name: Read existing Leads and collect public company evidence
         env:
-          GOOGLE_SHEETS_API_URL: \${{ secrets.GOOGLE_SHEETS_API_URL }}
-          GOOGLE_SHEETS_API_TOKEN: \${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
-        run: python diesel_leads/collector.py --seeds diesel_seeds.txt --market "\${{ inputs.market }}" --max-pages "\${{ inputs.max_pages_per_company }}" --output diesel_leads.jsonl
+          GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
+          GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
+        run: python diesel_leads/collector.py --seeds diesel_seeds.txt --market "${{ inputs.market }}" --max-pages "${{ inputs.max_pages_per_company }}" --output diesel_leads.jsonl
 
       - name: Merge new evidence into existing Leads rows
         env:
-          GOOGLE_SHEETS_API_URL: \${{ secrets.GOOGLE_SHEETS_API_URL }}
-          GOOGLE_SHEETS_API_TOKEN: \${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
+          GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
+          GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
         run: |
           python -m pip install requests
           python scripts/export_diesel_buyers_to_sheets.py diesel_leads.jsonl
