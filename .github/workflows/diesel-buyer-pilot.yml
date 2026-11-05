@@ -1,41 +1,53 @@
-name: Diesel buyer research (collection-only pilot)
+name: Diesel buyer research (fresh web discovery, collection only)
 
 on:
+  schedule:
+    - cron: "17 3 * * *"
+    - cron: "17 11 * * *"
+    - cron: "17 19 * * *"
   workflow_dispatch:
     inputs:
       market:
-        description: "Market priority for this batch"
+        description: "Market for this manual batch"
         required: true
         type: choice
         options:
           - China
           - Africa
         default: China
-      seed_urls:
-        description: "Public company or industry-directory URLs, one per line"
+      target_new_leads:
+        description: "Maximum genuinely new company records for this run"
         required: true
+        type: choice
+        options:
+          - "10"
+          - "20"
+          - "30"
+        default: "10"
+      seed_urls:
+        description: "Optional extra public company URLs, one per line (automatic discovery runs too)"
+        required: false
         type: string
       max_pages_per_company:
-        description: "Maximum same-site pages to inspect per URL"
+        description: "Maximum same-site pages to inspect per discovered company"
         required: true
         type: choice
         options:
           - "3"
           - "5"
-          - "8"
-        default: "5"
+        default: "3"
 
 permissions:
   contents: read
 
 concurrency:
-  group: diesel-buyer-pilot
+  group: diesel-buyer-research
   cancel-in-progress: false
 
 jobs:
   collect_only:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,11 +57,35 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Validate Google Sheets configuration and seed list
+      - name: Resolve market and batch target
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SCHEDULE_EXPR: ${{ github.event.schedule }}
+          INPUT_MARKET: ${{ inputs.market }}
+          INPUT_TARGET: ${{ inputs.target_new_leads }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "schedule" ]]; then
+            case "$SCHEDULE_EXPR" in
+              "17 3 * * *"|"17 11 * * *") MARKET="China" ;;
+              "17 19 * * *") MARKET="Africa" ;;
+              *) echo "Unknown schedule slot: $SCHEDULE_EXPR"; exit 1 ;;
+            esac
+            TARGET_NEW="10"
+          else
+            MARKET="$INPUT_MARKET"
+            TARGET_NEW="${INPUT_TARGET:-10}"
+          fi
+          echo "MARKET=$MARKET" >> "$GITHUB_ENV"
+          echo "TARGET_NEW=$TARGET_NEW" >> "$GITHUB_ENV"
+          echo "Batch market=$MARKET target_new=$TARGET_NEW"
+
+      - name: Validate Google Sheets configuration
         env:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
-          SEED_URLS: ${{ inputs.seed_urls }}
+          MANUAL_SEEDS: ${{ inputs.seed_urls }}
         shell: bash
         run: |
           set -euo pipefail
@@ -57,17 +93,31 @@ jobs:
             echo "Missing Google Sheets bridge secrets."
             exit 1
           fi
-          printf '%s\n' "${SEED_URLS}" > diesel_seeds.txt
-          if ! grep -Eq '^https?://' diesel_seeds.txt; then
-            echo "No valid http(s) seed URL was supplied."
-            exit 1
-          fi
+          printf '%s\n' "${MANUAL_SEEDS:-}" > manual_seeds.txt
+          : > diesel_seeds.txt
 
-      - name: Read existing Leads and collect public company evidence
+      - name: Discover fresh company websites from public web search
         env:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
-        run: python diesel_leads/collector.py --seeds diesel_seeds.txt --market "${{ inputs.market }}" --max-pages "${{ inputs.max_pages_per_company }}" --output diesel_leads.jsonl
+        run: |
+          set -euo pipefail
+          python scripts/discover_diesel_buyer_sites.py --market "$MARKET" --limit 60 --output discovered_seeds.txt
+          if [[ -s discovered_seeds.txt ]]; then
+            cat discovered_seeds.txt >> diesel_seeds.txt
+          fi
+          if [[ -s manual_seeds.txt ]]; then
+            cat manual_seeds.txt >> diesel_seeds.txt
+          fi
+          sort -u diesel_seeds.txt -o diesel_seeds.txt
+          echo "DISCOVERED_SEED_URLS=$(grep -c '^https\?://' diesel_seeds.txt || true)"
+
+      - name: Read existing Leads and collect genuinely new companies
+        env:
+          GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
+          GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
+        run: |
+          python diesel_leads/collector.py --seeds diesel_seeds.txt --market "$MARKET" --max-pages "${{ inputs.max_pages_per_company || '3' }}" --target-new "$TARGET_NEW" --output diesel_leads.jsonl
 
       - name: Merge new evidence into existing Leads rows
         env:
@@ -77,13 +127,14 @@ jobs:
           python -m pip install requests
           python scripts/export_diesel_buyers_to_sheets.py diesel_leads.jsonl
 
-      - name: Upload collection report
+      - name: Upload discovery and collection report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: diesel-buyer-collection-report
+          name: diesel-buyer-research-report
           path: |
-            diesel_leads.jsonl
+            discovered_seeds.txt
             diesel_seeds.txt
+            diesel_leads.jsonl
           if-no-files-found: ignore
           retention-days: 14
