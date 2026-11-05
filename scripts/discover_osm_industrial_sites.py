@@ -146,6 +146,13 @@ def main() -> int:
         *urls,
     ]
     output.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    domains_file = Path(".cache/osm_seed_domains.txt")
+    domains_file.write_text(
+        "# © OpenStreetMap contributors, ODbL; regional extracts supplied by Geofabrik\n"
+        + "\n".join(sorted({urlparse(url).hostname.lower().removeprefix("www.") for url in urls}))
+        + ("\n" if urls else ""),
+        encoding="utf-8",
+    )
     shutil.copyfile(output, cache_file)
     print(f"OSM_DISCOVERY_COMPLETE market={args.market} regions={successful_regions} websites={len(urls)} output={output}")
     return 0
