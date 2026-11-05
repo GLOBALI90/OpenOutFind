@@ -1,9 +1,9 @@
 """Discover fresh public company websites for diesel/gasoil buyer research.
 
-Uses Bing's public RSS search endpoint (no API key). It reads the existing Leads
-sheet first and excludes domains already stored, so each scheduled batch looks
-for new companies rather than replaying the same seed list. No social login,
-private data, or outbound messaging is used.
+Uses Bing's public RSS search endpoint (no API key). It excludes domains already
+stored in Leads and domains persisted in the GitHub Actions cache, including sites
+checked in prior runs that did not qualify. No social login, private data, or
+outbound messaging is used.
 """
 from __future__ import annotations
 
