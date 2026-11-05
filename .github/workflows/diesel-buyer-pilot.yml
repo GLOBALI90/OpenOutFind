@@ -80,11 +80,3 @@ jobs:
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
         run: python scripts/export_diesel_buyers_to_sheets.py diesel_leads.jsonl
 
-      - name: Upload pilot result
-        if: always() && hashFiles('diesel_leads.jsonl') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: diesel-buyer-pilot-${{ github.run_id }}
-          path: diesel_leads.jsonl
-          if-no-files-found: ignore
-          retention-days: 14
