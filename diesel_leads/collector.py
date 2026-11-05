@@ -33,6 +33,7 @@ DIESEL_TERMS = (
 )
 EXISTING_COMPANY_DOMAINS: set[str] = set()
 SUCCESSFULLY_FETCHED_DOMAINS: set[str] = set()
+OSM_SEED_DOMAINS: set[str] = set()
 CHECKED_DOMAINS_FILE = Path('.cache/diesel_checked_domains_v2.txt')
 
 SECTOR_TERMS = {
@@ -260,8 +261,16 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
         "website_domain": domain,
         "market_search_bucket": market,
         "target_market": market,
-        "source": f"Public company website: {parsed_seed.scheme}://{parsed_seed.netloc}",
-        "source_provider": "public_company_website",
+        "source": (
+            f"OpenStreetMap contributors (ODbL; Geofabrik regional extract) + public company website: {parsed_seed.scheme}://{parsed_seed.netloc}"
+            if domain in OSM_SEED_DOMAINS
+            else f"Public company website: {parsed_seed.scheme}://{parsed_seed.netloc}"
+        ),
+        "source_provider": (
+            "openstreetmap_geofabrik_and_public_company_website"
+            if domain in OSM_SEED_DOMAINS
+            else "public_company_website"
+        ),
         "lead_segment": "Diesel / Gasoil buyer research",
         "product_interest": "Diesel / Gasoil",
         "lead_source": "public_company_website_research",
@@ -297,8 +306,16 @@ def main() -> int:
     parser.add_argument("--output", default="diesel_leads.jsonl")
     parser.add_argument("--target-new", type=int, default=10, help="Stop after this many genuinely new companies; existing domains are skipped.")
     args = parser.parse_args()
-    global EXISTING_COMPANY_DOMAINS
+    global EXISTING_COMPANY_DOMAINS, OSM_SEED_DOMAINS
     EXISTING_COMPANY_DOMAINS = read_existing_company_domains()
+    osm_domains_file = Path(".cache/osm_seed_domains.txt")
+    if osm_domains_file.exists():
+        OSM_SEED_DOMAINS = {
+            line.strip().lower().removeprefix("www.")
+            for line in osm_domains_file.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        }
+    print(f"OSM_SEED_PROVENANCE_LOADED domains={len(OSM_SEED_DOMAINS)}")
     print(f"EXISTING_LEADS_READ count={len(EXISTING_COMPANY_DOMAINS)} tab=Leads")
     rows: dict[str, dict] = {}
     for line in Path(args.seeds).read_text(encoding="utf-8").splitlines():
