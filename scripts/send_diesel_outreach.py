@@ -223,10 +223,33 @@ def main() -> int:
         and _values(row, "whatsapp_numbers", "whatsapp")
         and str(row.get("whatsapp_send_status") or "").strip().lower() not in {"sent", "queued", "sending"}
     )
+    found_emails = {value for row in rows for value in _values(row, "commercial_emails", "email")}
+    found_phones = {value for row in rows for value in _values(row, "business_phones", "phone")}
+    found_whatsapp = {value for row in rows for value in _values(row, "whatsapp_numbers", "whatsapp")}
+    email_contact_rows = sum(bool(_values(row, "commercial_emails", "email")) for row in rows)
+    phone_contact_rows = sum(bool(_values(row, "business_phones", "phone")) for row in rows)
+    whatsapp_contact_rows = sum(bool(_values(row, "whatsapp_numbers", "whatsapp")) for row in rows)
+    email_blocked_no_approval = sum(
+        1 for row in rows if _values(row, "commercial_emails", "email")
+        and not _true(row.get("email_outreach_eligible")) and not _suppressed(row)
+    )
+    whatsapp_blocked_no_optin = sum(
+        1 for row in rows if _values(row, "whatsapp_numbers", "whatsapp")
+        and not _true(row.get("whatsapp_opt_in")) and not _suppressed(row)
+    )
+    print(
+        f"CONTACT_INVENTORY rows={len(rows)} "
+        f"companies_with_email={email_contact_rows} unique_emails={len(found_emails)} "
+        f"companies_with_phone={phone_contact_rows} unique_phone_numbers={len(found_phones)} "
+        f"companies_with_whatsapp={whatsapp_contact_rows} unique_whatsapp_numbers={len(found_whatsapp)}"
+    )
     print(
         f"OUTREACH_PREFLIGHT rows={len(rows)} "
         f"email_eligible={email_eligible} email_ready={email_ready} "
-        f"whatsapp_opted_in={whatsapp_opted_in} whatsapp_ready={whatsapp_ready}"
+        f"email_blocked_no_approval={email_blocked_no_approval} "
+        f"whatsapp_opted_in={whatsapp_opted_in} whatsapp_ready={whatsapp_ready} "
+        f"whatsapp_blocked_no_optin={whatsapp_blocked_no_optin} "
+        f"suppressed={sum(_suppressed(row) for row in rows)}"
     )
     wa_key = os.environ.get("WUAPI_API_KEY", "").strip()
     wa_account = _wuapi_account_id(wa_key) if args.whatsapp and wa_key else ""
