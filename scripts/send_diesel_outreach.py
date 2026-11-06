@@ -12,6 +12,7 @@ import email.utils
 import hashlib
 import json
 import os
+import re
 import smtplib
 import ssl
 import sys
@@ -110,6 +111,18 @@ def _values(row: dict, *keys: str) -> list[str]:
 
 def _suppressed(row: dict) -> bool:
     return _true(row.get("do_not_contact")) or _true(row.get("unsubscribed"))
+
+
+def _verified_whatsapp_numbers(row: dict) -> list[str]:
+    # Legacy "whatsapp" values may be ordinary telephone numbers. Only trust the
+    # dedicated field when the collector recorded an explicit wa.me/API link.
+    status = str(row.get("whatsapp_status") or "").strip().lower()
+    if status not in {"explicit_link", "wa_link_confirmed"}:
+        return []
+    return [
+        number for number in _values(row, "whatsapp_numbers")
+        if re.fullmatch(r"\\+[1-9]\\d{7,14}", number)
+    ]
 
 
 def _email_message(row: dict, recipient: str) -> EmailMessage:
@@ -220,7 +233,7 @@ def main() -> int:
     whatsapp_ready = sum(
         1 for row in rows
         if _true(row.get("whatsapp_opt_in")) and not _suppressed(row)
-        and _values(row, "whatsapp_numbers", "whatsapp")
+        and _verified_whatsapp_numbers(row)
         and str(row.get("whatsapp_send_status") or "").strip().lower() not in {"sent", "queued", "sending"}
     )
     found_emails = {value for row in rows for value in _values(row, "commercial_emails", "email")}
