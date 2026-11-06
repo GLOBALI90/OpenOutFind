@@ -355,6 +355,19 @@ def main() -> int:
             if len(rows) >= max(1, args.target_new):
                 print(f"TARGET_REACHED new_candidates={len(rows)}")
                 break
+    # Report contact discovery as counts only; never print harvested personal contact values.
+    all_emails = {value for row in rows.values() for value in row.get("commercial_emails", []) if value}
+    all_phones = {value for row in rows.values() for value in row.get("business_phones", []) if value}
+    all_whatsapp = {value for row in rows.values() for value in row.get("whatsapp_numbers", []) if value}
+    print(
+        f"CONTACT_EXTRACTION_SUMMARY candidates={len(rows)} "
+        f"companies_with_email={sum(bool(row.get('commercial_emails')) for row in rows.values())} "
+        f"unique_emails={len(all_emails)} "
+        f"companies_with_phone={sum(bool(row.get('business_phones')) for row in rows.values())} "
+        f"unique_phone_numbers={len(all_phones)} "
+        f"companies_with_whatsapp={sum(bool(row.get('whatsapp_numbers')) for row in rows.values())} "
+        f"unique_whatsapp_numbers={len(all_whatsapp)}"
+    )
     with Path(args.output).open("w", encoding="utf-8") as handle:
         for row in rows.values():
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
