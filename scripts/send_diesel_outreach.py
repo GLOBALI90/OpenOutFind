@@ -209,6 +209,25 @@ def main() -> int:
     rows = _read_leads()
     email_sent = _daily_count(rows, "email")
     wa_sent = _daily_count(rows, "whatsapp")
+    email_eligible = sum(1 for row in rows if _true(row.get("email_outreach_eligible")) and not _suppressed(row))
+    email_ready = sum(
+        1 for row in rows
+        if _true(row.get("email_outreach_eligible")) and not _suppressed(row)
+        and _values(row, "commercial_emails", "email")
+        and str(row.get("email_send_status") or "").strip().lower() not in {"sent", "queued", "sending"}
+    )
+    whatsapp_opted_in = sum(1 for row in rows if _true(row.get("whatsapp_opt_in")) and not _suppressed(row))
+    whatsapp_ready = sum(
+        1 for row in rows
+        if _true(row.get("whatsapp_opt_in")) and not _suppressed(row)
+        and _values(row, "whatsapp_numbers", "whatsapp")
+        and str(row.get("whatsapp_send_status") or "").strip().lower() not in {"sent", "queued", "sending"}
+    )
+    print(
+        f"OUTREACH_PREFLIGHT rows={len(rows)} "
+        f"email_eligible={email_eligible} email_ready={email_ready} "
+        f"whatsapp_opted_in={whatsapp_opted_in} whatsapp_ready={whatsapp_ready}"
+    )
     wa_key = os.environ.get("WUAPI_API_KEY", "").strip()
     wa_account = _wuapi_account_id(wa_key) if args.whatsapp and wa_key else ""
     if args.whatsapp and not wa_key:
