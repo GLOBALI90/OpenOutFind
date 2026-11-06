@@ -245,6 +245,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--email", action="store_true")
     parser.add_argument("--whatsapp", action="store_true")
+    parser.add_argument("--dry-run", action="store_true", help="Print eligibility and readiness only; never send messages.")
     args = parser.parse_args()
     if not args.email and not args.whatsapp:
         print("No channel selected; collection only. No messages sent.")
@@ -295,6 +296,10 @@ def main() -> int:
         f"whatsapp_blocked_no_optin={whatsapp_blocked_no_optin} "
         f"suppressed={sum(_suppressed(row) for row in rows)}"
     )
+    if args.dry_run:
+        print("DRY_RUN_ONLY no messages sent; preflight report above is the result.")
+        return 0
+
     wa_key = os.environ.get("WUAPI_API_KEY", "").strip()
     wa_account = _wuapi_account_id(wa_key) if args.whatsapp and wa_key else ""
     if args.whatsapp and not wa_key:
@@ -332,7 +337,7 @@ def main() -> int:
 
         if args.whatsapp and wa_sent < WHATSAPP_DAILY_LIMIT and _true(row.get("whatsapp_opt_in")):
             prior = str(row.get("whatsapp_send_status") or "").strip().lower()
-            numbers = _values(row, "whatsapp_numbers", "whatsapp")
+            numbers = _verified_whatsapp_numbers(row)
             if prior not in {"sent", "queued", "sending"} and numbers:
                 recipient = numbers[0]
                 if not recipient.startswith("+"):
