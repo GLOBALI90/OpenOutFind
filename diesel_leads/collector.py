@@ -183,6 +183,11 @@ def _normalise_phone(raw: str) -> str:
     return ("+" + digits) if value.startswith("+") else digits
 
 
+def _is_qualified_buyer(diesel_hits: list[str], sector_hits: dict[str, list[str]]) -> bool:
+    # Require explicit diesel/gasoil evidence and a specific high-consumption sector phrase.
+    return bool(diesel_hits) and any(sector_hits.values())
+
+
 def _contact_data(text: str, links: list[str]) -> tuple[list[str], list[str], list[str], str, list[str]]:
     email_values = set(EMAIL_RE.findall(text))
     phone_values = set(PHONE_RE.findall(text))
