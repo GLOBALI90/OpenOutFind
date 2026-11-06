@@ -28,3 +28,23 @@ def test_only_explicit_whatsapp_links_are_classified_as_whatsapp():
     assert status == "explicit_link"
     assert evidence == ["https://wa.me/27821234567"]
     assert "buyer@example.com" in emails
+
+
+
+def test_sender_never_treats_legacy_phone_field_as_whatsapp():
+    from scripts.send_diesel_outreach import _verified_whatsapp_numbers
+
+    assert _verified_whatsapp_numbers({
+        "whatsapp": "+27821234567",
+        "whatsapp_numbers": "[]",
+        "whatsapp_status": "not_verified",
+    }) == []
+    assert _verified_whatsapp_numbers({
+        "whatsapp": "+27821234567",
+        "whatsapp_numbers": '["+27821234567"]',
+        "whatsapp_status": "explicit_link",
+    }) == ["+27821234567"]
+    assert _verified_whatsapp_numbers({
+        "whatsapp_numbers": '["+123456789012345678"]',
+        "whatsapp_status": "explicit_link",
+    }) == []
