@@ -46,6 +46,11 @@ on:
         required: true
         type: boolean
         default: false
+      dry_run:
+        description: "Safety mode: report eligible contacts only; no messages are sent"
+        required: true
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -172,9 +177,11 @@ jobs:
           GMAIL_USERNAME: ${{ secrets.GMAIL_USERNAME }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           WUAPI_API_KEY: ${{ secrets.WUAPI_API_KEY }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
           ARGS=()
+          if [[ "$DRY_RUN" == "true" ]]; then ARGS+=(--dry-run); fi
           if [[ "$SEND_EMAIL" == "true" ]]; then ARGS+=(--email); fi
           if [[ "$SEND_WHATSAPP" == "true" ]]; then ARGS+=(--whatsapp); fi
           python scripts/send_diesel_outreach.py "${ARGS[@]}"
