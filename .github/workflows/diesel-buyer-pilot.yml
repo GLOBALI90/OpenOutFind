@@ -1,4 +1,4 @@
-name: Diesel buyer research (fresh web discovery, collection only)
+name: Diesel buyer research and consented outreach
 
 on:
   schedule:
@@ -40,17 +40,17 @@ on:
         description: "Send approved B2B emails (20/day max; requires email_outreach_eligible=TRUE)"
         required: true
         type: boolean
-        default: false
+        default: true
       send_whatsapp:
         description: "Send WhatsApp only to recorded opt-ins (5/day max; requires whatsapp_opt_in=TRUE)"
         required: true
         type: boolean
-        default: false
+        default: true
       dry_run:
         description: "Safety mode: report eligible contacts only; no messages are sent"
         required: true
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: read
