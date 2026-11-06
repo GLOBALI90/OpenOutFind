@@ -121,7 +121,7 @@ def _verified_whatsapp_numbers(row: dict) -> list[str]:
         return []
     return [
         number for number in _values(row, "whatsapp_numbers")
-        if re.fullmatch(r"\\+[1-9]\\d{7,14}", number)
+        if re.fullmatch(r"\+[1-9]\d{7,14}", number)
     ]
 
 
