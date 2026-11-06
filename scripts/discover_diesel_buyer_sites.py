@@ -26,7 +26,10 @@ BLOCKED_HOSTS = {
     "linkedin.com", "www.linkedin.com", "facebook.com", "www.facebook.com",
     "instagram.com", "x.com", "twitter.com", "youtube.com", "www.youtube.com",
     "wikipedia.org", "www.wikipedia.org", "google.com", "www.google.com",
-    "maps.google.com",
+    "maps.google.com", "meinestadt.de", "www.meinestadt.de",
+    "yelp.com", "www.yelp.com", "yellowpages.com", "www.yellowpages.com",
+    "tripadvisor.com", "www.tripadvisor.com", "amazon.com", "www.amazon.com",
+    "ebay.com", "www.ebay.com", "etsy.com", "www.etsy.com",
 }
 
 CHINA_QUERIES = [
