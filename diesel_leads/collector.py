@@ -140,13 +140,14 @@ def _robots_parser(base_url: str) -> urllib.robotparser.RobotFileParser:
 
 
 def _fetch(url: str) -> tuple[str, PageParser] | None:
-    # Public directories sometimes contain literal spaces in PDF/document links.
-    # Percent-encode URL path/query before urllib validates the request target.
+    # Public directories sometimes contain literal spaces in document links.
+    # Encode path/query components before urllib validates the request target.
     try:
         parsed = urllib.parse.urlsplit(url)
-        safe_path = urllib.parse.quote(parsed.path, safe="/%:@!def _fetch(url: str) -> tuple[str, PageParser] | None:
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "text/html"})
-    try:
+        safe_path = urllib.parse.quote(parsed.path, safe="/%:@!$&'()*+,;=-._~")
+        safe_query = urllib.parse.quote(parsed.query, safe="=&?/:;+,%@!$'()*,-._~")
+        safe_url = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, safe_path, safe_query, ""))
+        request = urllib.request.Request(safe_url, headers={"User-Agent": USER_AGENT, "Accept": "text/html"})
         with urllib.request.urlopen(request, timeout=12) as response:
             content_type = response.headers.get_content_type()
             if content_type not in {"text/html", "application/xhtml+xml"}:
@@ -155,10 +156,10 @@ def _fetch(url: str) -> tuple[str, PageParser] | None:
             parser = PageParser()
             parser.feed(body)
             return response.geturl(), parser
-    except (urllib.error.URLError, TimeoutError, ValueError):
-        return None'()*+,;=-._~")
-        safe_query = urllib.parse.quote(parsed.query, safe="=&?/:;+,%@!
-
+    except Exception as exc:
+        # One malformed URL or remote-site failure must never abort the market batch.
+        print(f"PAGE_FETCH_FAILED reason={type(exc).__name__}")
+        return None
 
 def _normalise_phone(raw: str) -> str:
     value = re.sub(r"[^\d+]", "", raw)
@@ -368,238 +369,6 @@ def main() -> int:
         f"companies_with_whatsapp={sum(bool(row.get('whatsapp_numbers')) for row in rows.values())} "
         f"unique_whatsapp_numbers={len(all_whatsapp)}"
     )
-    with Path(args.output).open("w", encoding="utf-8") as handle:
-        for row in rows.values():
-            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
-    CHECKED_DOMAINS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    checked = set()
-    if CHECKED_DOMAINS_FILE.exists():
-        checked.update(line.strip() for line in CHECKED_DOMAINS_FILE.read_text(encoding="utf-8").splitlines() if line.strip())
-    checked.update(SUCCESSFULLY_FETCHED_DOMAINS)
-    CHECKED_DOMAINS_FILE.write_text("\n".join(sorted(checked)) + ("\n" if checked else ""), encoding="utf-8")
-    print(f"CRAWL_DIAGNOSTICS fetched_domains={len(SUCCESSFULLY_FETCHED_DOMAINS)} checked_domains_total={len(checked)}")
-    existing_count = sum(1 for row in rows.values() if row.get("previously_in_leads"))
-    print(
-        f"Collected {len(rows)} unique company record(s): "
-        f"{len(rows) - existing_count} new candidate(s), {existing_count} existing company refresh(es)."
-    )
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
-()*-._~")
-        url = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, safe_path, safe_query, ""))
-        request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "text/html"})
-        with urllib.request.urlopen(request, timeout=12) as response:
-            content_type = response.headers.get_content_type()
-            if content_type not in {"text/html", "application/xhtml+xml"}:
-                return None
-            body = response.read(1_500_000).decode(response.headers.get_content_charset() or "utf-8", "replace")
-            parser = PageParser()
-            parser.feed(body)
-            return response.geturl(), parser
-    except Exception as exc:
-        # One malformed URL or remote-site failure must never abort the market batch.
-        print(f"PAGE_FETCH_FAILED reason={type(exc).__name__}")
-        return None
-
-
-def _normalise_phone(raw: str) -> str:
-    value = re.sub(r"[^\d+]", "", raw)
-    if value.startswith("00"):
-        value = "+" + value[2:]
-    return value if len(re.sub(r"\D", "", value)) >= 8 else ""
-
-
-def _contact_data(text: str, links: list[str]) -> tuple[list[str], list[str], list[str], str, list[str]]:
-    email_values = set(EMAIL_RE.findall(text))
-    phone_values = set(PHONE_RE.findall(text))
-    wa_numbers: set[str] = set()
-    wa_evidence: set[str] = set()
-
-    for link in links:
-        absolute = urllib.parse.urljoin("https://placeholder.invalid", link.strip())
-        parsed = urllib.parse.urlparse(absolute)
-        host = (parsed.hostname or "").lower()
-        query = urllib.parse.parse_qs(parsed.query)
-
-        if parsed.scheme.lower() == "mailto":
-            address = urllib.parse.unquote(parsed.path).split("?", 1)[0].strip()
-            if address:
-                email_values.add(address)
-        elif parsed.scheme.lower() == "tel":
-            phone_values.add(urllib.parse.unquote(parsed.path))
-
-        raw = ""
-        if host == "wa.me":
-            raw = parsed.path.strip("/").split("/", 1)[0]
-        elif host in {"api.whatsapp.com", "www.whatsapp.com", "whatsapp.com"} and parsed.path.startswith("/send"):
-            raw = (query.get("phone") or [""])[0]
-        if raw:
-            normalised_raw = raw if raw.startswith(("+", "00")) else "+" + raw
-            number = _normalise_phone(normalised_raw)
-            if number:
-                wa_numbers.add(number)
-                wa_evidence.add(link)
-
-    emails = sorted({
-        urllib.parse.unquote(e).strip().lower()
-        for e in email_values
-        if re.fullmatch(r"(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", urllib.parse.unquote(e).strip())
-    })
-    phones = sorted({p for raw in phone_values if (p := _normalise_phone(raw))})
-    status = "explicit_link" if wa_numbers else "not_verified"
-    return emails, phones, sorted(wa_numbers), status, sorted(wa_evidence)
-
-
-def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | None:
-    seed_url = seed_url.strip()
-    if not _public_http_url(seed_url):
-        return None
-    parsed_seed = urllib.parse.urlparse(seed_url)
-    host = (parsed_seed.hostname or "").lower()
-    robots = _robots_parser(seed_url)
-    queue = deque([seed_url])
-    visited: set[str] = set()
-    all_text: list[str] = []
-    all_links: list[str] = []
-    source_urls: list[str] = []
-    company_name = host
-    while queue and len(visited) < max_pages:
-        url = queue.popleft()
-        url, _frag = urllib.parse.urldefrag(url)
-        if url in visited or not _public_http_url(url):
-            continue
-        parsed = urllib.parse.urlparse(url)
-        if (parsed.hostname or "").lower() != host:
-            continue
-        if not robots.can_fetch(USER_AGENT, url):
-            print(f"PAGE_BLOCKED_ROBOTS domain={host} path={parsed.path or '/'}")
-            continue
-        visited.add(url)
-        result = _fetch(url)
-        if result is None:
-            print(f"PAGE_FETCH_FAILED domain={host} path={parsed.path or '/'}")
-            continue
-        final_url, page = result
-        SUCCESSFULLY_FETCHED_DOMAINS.add(host.removeprefix('www.'))
-        if (urllib.parse.urlparse(final_url).hostname or "").lower() != host:
-            continue
-        text = " ".join(page.parts)
-        all_text.append(text)
-        all_links.extend(page.links)
-        source_urls.append(final_url)
-        if page.site_name or page.title_parts:
-            company_name = page.site_name or " ".join(page.title_parts)[:160]
-        for href in page.links:
-            absolute = urllib.parse.urljoin(final_url, href)
-            link = urllib.parse.urlparse(absolute)
-            if (link.hostname or "").lower() == host and any(h in link.path.lower() for h in CONTACT_PATH_HINTS):
-                if absolute not in visited and absolute not in queue:
-                    queue.append(absolute)
-        time.sleep(1.0)
-
-    combined = " ".join(all_text).lower()
-    diesel_hits = sorted({term for term in DIESEL_TERMS if term in combined})
-    sector_hits = {
-        sector: sorted({term for term in terms if term in combined})
-        for sector, terms in SECTOR_TERMS.items()
-    }
-    sector_hits = {k: v for k, v in sector_hits.items() if v}
-    if not diesel_hits and not sector_hits:
-        print(f"REJECT_NOT_RELEVANT domain={host} pages_fetched={len(source_urls)} diesel_hits=0 sector_hits=0")
-        return None
-
-    emails, phones, whatsapp, wa_status, wa_evidence = _contact_data(" ".join(all_text), all_links)
-    direct = bool(diesel_hits)
-    score = min(100, (65 if direct else 0) + min(25, 8 * len(sector_hits)) + (5 if emails else 0) + (5 if phones else 0))
-    domain = host.removeprefix("www.")
-    key = hashlib.sha256(domain.encode("utf-8")).hexdigest()[:24]
-    return {
-        "lead_key": key,
-        "lead_id": key,
-        "company_name": company_name,
-        "website": f"{parsed_seed.scheme}://{parsed_seed.netloc}",
-        "website_domain": domain,
-        "market_search_bucket": market,
-        "target_market": market,
-        "source": (
-            f"OpenStreetMap contributors (ODbL; Geofabrik regional extract) + public company website: {parsed_seed.scheme}://{parsed_seed.netloc}"
-            if domain in OSM_SEED_DOMAINS
-            else f"Public company website: {parsed_seed.scheme}://{parsed_seed.netloc}"
-        ),
-        "source_provider": (
-            "openstreetmap_geofabrik_and_public_company_website"
-            if domain in OSM_SEED_DOMAINS
-            else "public_company_website"
-        ),
-        "lead_segment": "Diesel / Gasoil buyer research",
-        "product_interest": "Diesel / Gasoil",
-        "lead_source": "public_company_website_research",
-        "industry": ", ".join(sorted(sector_hits)),
-        "email": "; ".join(emails),
-        "phone": "; ".join(phones),
-        "whatsapp": "; ".join(whatsapp),
-        "evidence": "Diesel terms: " + ", ".join(diesel_hits) + "; sectors: " + ", ".join(sorted(sector_hits)),
-        "lead_score": score,
-        "collected_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "country": "",
-        "city": "",
-        "buyer_type": "direct_diesel_evidence" if direct else "sector_candidate_needs_confirmation",
-        "diesel_evidence_terms": diesel_hits,
-        "sector_evidence": sector_hits,
-        "commercial_emails": emails,
-        "business_phones": phones,
-        "whatsapp_numbers": whatsapp,
-        "whatsapp_status": wa_status,
-        "whatsapp_evidence": wa_evidence,
-        "outreach_consent_status": "not_recorded",
-        "email_send_status": "not_sent",
-        "whatsapp_send_status": "not_sent",
-        "contact_validation": "format_only_not_mailbox_verified" if emails else "not_found",
-        "qualification_score": score,
-        "source_urls": sorted(set(source_urls)),
-        "evidence_note": "Direct diesel-related text found on public company pages." if direct else "Relevant fuel-consuming sector found; diesel consumption is not confirmed.",
-        "collected_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-    }
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--seeds", required=True, help="Text file containing one public company/directory URL per line")
-    parser.add_argument("--market", default="China", choices=("China", "Africa"))
-    parser.add_argument("--max-pages", type=int, default=5)
-    parser.add_argument("--output", default="diesel_leads.jsonl")
-    parser.add_argument("--target-new", type=int, default=10, help="Stop after this many genuinely new companies; existing domains are skipped.")
-    args = parser.parse_args()
-    global EXISTING_COMPANY_DOMAINS, OSM_SEED_DOMAINS
-    EXISTING_COMPANY_DOMAINS = read_existing_company_domains()
-    osm_domains_file = Path(".cache/osm_seed_domains.txt")
-    if osm_domains_file.exists():
-        OSM_SEED_DOMAINS = {
-            line.strip().lower().removeprefix("www.")
-            for line in osm_domains_file.read_text(encoding="utf-8").splitlines()
-            if line.strip() and not line.lstrip().startswith("#")
-        }
-    print(f"OSM_SEED_PROVENANCE_LOADED domains={len(OSM_SEED_DOMAINS)}")
-    print(f"EXISTING_LEADS_READ count={len(EXISTING_COMPANY_DOMAINS)} tab=Leads")
-    rows: dict[str, dict] = {}
-    for line in Path(args.seeds).read_text(encoding="utf-8").splitlines():
-        seed = line.strip()
-        if not seed or seed.startswith("#"):
-            continue
-        row = collect_company(seed, args.market, max(1, min(args.max_pages, 10)))
-        if row:
-            if row["website_domain"] in EXISTING_COMPANY_DOMAINS:
-                print(f"SKIP_EXISTING_DOMAIN domain={row['website_domain']}")
-                continue
-            row["record_status"] = "new_company_candidate"
-            row["previously_in_leads"] = False
-            rows[row["lead_key"]] = row
-            if len(rows) >= max(1, args.target_new):
-                print(f"TARGET_REACHED new_candidates={len(rows)}")
-                break
     with Path(args.output).open("w", encoding="utf-8") as handle:
         for row in rows.values():
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
