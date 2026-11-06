@@ -39,19 +39,23 @@ def website_url(raw: str) -> str:
 
 
 def relevant(tags) -> bool:
+    # Match exact OSM tag keys/values only. Substring scans such as "mine" in
+    # arbitrary tag text produced false positives (e.g. unrelated directory pages).
     pairs = {str(tag.k).lower(): str(tag.v).lower() for tag in tags}
-    combined = " ".join(f"{k}={v}" for k, v in pairs.items())
-    keys = (
-        "industrial=", "landuse=industrial", "man_made=works", "man_made=mine",
-        "landuse=quarry", "power=plant", "power=generator", "amenity=port",
-        "office=logistics", "building=industrial", "industrial=oil",
-        "industrial=chemical", "industrial=cement", "industrial=warehouse",
+    allowed_industries = {
+        "oil", "chemical", "cement", "steel", "manufacturing",
+        "quarry", "mining", "port", "logistics", "warehouse",
+    }
+    return (
+        pairs.get("landuse") == "industrial"
+        or pairs.get("man_made") in {"works", "mine"}
+        or pairs.get("landuse") == "quarry"
+        or pairs.get("power") in {"plant", "generator"}
+        or pairs.get("amenity") == "port"
+        or pairs.get("office") == "logistics"
+        or pairs.get("building") == "industrial"
+        or pairs.get("industrial") in allowed_industries
     )
-    words = (
-        "mine", "quarry", "port", "cement", "steel", "factory", "industrial",
-        "logistics", "warehouse", "power", "oil", "chemical", "manufacturing",
-    )
-    return any(key in combined for key in keys) or any(word in combined for word in words)
 
 
 def extract_region(index: dict, region_id: str, out_dir: Path, handler) -> int:
