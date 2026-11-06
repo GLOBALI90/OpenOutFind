@@ -36,7 +36,14 @@ SUCCESSFULLY_FETCHED_DOMAINS: set[str] = set()
 OSM_SEED_DOMAINS: set[str] = set()
 CHECKED_DOMAINS_FILE = Path('.cache/diesel_checked_domains_v2.txt')
 
-BUYER_SECTORS = {"mining", "transport_logistics", "shipping_ports", "construction", "power_generation", "cement_manufacturing"}
+BUYER_SECTOR_TERMS = {
+    "mining": ("mine operator", "mineral processing", "mining operations", "mining fleet"),
+    "transport_logistics": ("trucking", "haulage", "logistics fleet", "transport fleet", "truck fleet"),
+    "shipping_ports": ("marine fleet", "port operator", "vessel fleet", "shipping company"),
+    "construction": ("construction equipment", "earthmoving", "heavy equipment fleet"),
+    "power_generation": ("power plant", "backup generator", "power generation"),
+    "cement_manufacturing": ("cement plant", "cement manufacturing"),
+}
 
 SECTOR_TERMS = {
     "mining": ("mining", "mine operator", "mineral processing", "矿业", "矿山", "minière", "تعدين", "mineração"),
@@ -267,8 +274,10 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
     combined = " ".join(all_text).lower()
     diesel_hits = sorted({term for term in DIESEL_TERMS if term in combined})
     qualified_sectors = {
-        key: values for key, values in sector_hits.items() if key in BUYER_SECTORS
+        sector: [term for term in terms if term in combined]
+        for sector, terms in BUYER_SECTOR_TERMS.items()
     }
+    qualified_sectors = {key: values for key, values in qualified_sectors.items() if values}
     if not _is_qualified_buyer(diesel_hits, qualified_sectors):
         print(
             f"REJECT_NOT_QUALIFIED_BUYER domain={host} pages_fetched={len(source_urls)} "
@@ -326,7 +335,7 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
         "contact_validation": "format_only_not_mailbox_verified" if emails else "not_found",
         "qualification_score": score,
         "source_urls": sorted(set(source_urls)),
-        "evidence_note": "Direct diesel/gasoil evidence and a high-consumption buyer sector were both found on the company website.",
+        "evidence_note": "Direct diesel/gasoil evidence and a specific high-consumption buyer-sector phrase were both found on the company website.",
         "collected_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
 
