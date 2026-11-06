@@ -269,10 +269,10 @@ def main() -> int:
     )
     found_emails = {value for row in rows for value in _values(row, "commercial_emails", "email")}
     found_phones = {value for row in rows for value in _values(row, "business_phones", "phone")}
-    found_whatsapp = {value for row in rows for value in _values(row, "whatsapp_numbers", "whatsapp")}
+    found_whatsapp = {value for row in rows for value in _verified_whatsapp_numbers(row)}
     email_contact_rows = sum(bool(_values(row, "commercial_emails", "email")) for row in rows)
     phone_contact_rows = sum(bool(_values(row, "business_phones", "phone")) for row in rows)
-    whatsapp_contact_rows = sum(bool(_values(row, "whatsapp_numbers", "whatsapp")) for row in rows)
+    whatsapp_contact_rows = sum(bool(_verified_whatsapp_numbers(row)) for row in rows)
     email_blocked_no_approval = sum(
         1 for row in rows if _qualified_buyer_row(row) and _values(row, "commercial_emails", "email")
         and not _true(row.get("email_outreach_eligible")) and not _suppressed(row)
