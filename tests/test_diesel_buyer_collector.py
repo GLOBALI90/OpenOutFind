@@ -48,3 +48,25 @@ def test_sender_never_treats_legacy_phone_field_as_whatsapp():
         "whatsapp_numbers": '["+123456789012345678"]',
         "whatsapp_status": "explicit_link",
     }) == []
+
+
+
+def test_outreach_rejects_old_sector_only_and_non_buyer_rows():
+    from scripts.send_diesel_outreach import _qualified_buyer_row
+
+    good = {
+        "buyer_type": "direct_diesel_evidence",
+        "diesel_evidence_terms": '["diesel"]',
+        "sector_evidence": '{"mining":["mine operator"]}',
+    }
+    assert _qualified_buyer_row(good)
+    assert not _qualified_buyer_row({
+        "buyer_type": "sector_candidate_needs_confirmation",
+        "diesel_evidence_terms": "[]",
+        "sector_evidence": '{"mining":["mining"]}',
+    })
+    assert not _qualified_buyer_row({
+        "buyer_type": "direct_diesel_evidence",
+        "diesel_evidence_terms": '["diesel"]',
+        "sector_evidence": '{"agriculture":["agriculture"]}',
+    })
