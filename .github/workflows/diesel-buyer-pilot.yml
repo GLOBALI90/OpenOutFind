@@ -167,11 +167,11 @@ jobs:
           python -m pip install requests
           python scripts/export_diesel_buyers_to_sheets.py diesel_leads.jsonl
 
-      - name: Send approved outreach (manual runs only)
-        if: github.event_name == 'workflow_dispatch' && (inputs.send_email || inputs.send_whatsapp)
+      - name: Send approved outreach (scheduled and manual runs)
+        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (inputs.send_email || inputs.send_whatsapp))
         env:
-          SEND_EMAIL: ${{ inputs.send_email }}
-          SEND_WHATSAPP: ${{ inputs.send_whatsapp }}
+          SEND_EMAIL: ${{ github.event_name == 'schedule' || inputs.send_email }}
+          SEND_WHATSAPP: ${{ github.event_name == 'schedule' || inputs.send_whatsapp }}
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
           GMAIL_USERNAME: ${{ secrets.GMAIL_USERNAME }}
