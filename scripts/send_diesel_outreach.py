@@ -32,6 +32,14 @@ COMPANY_DETAILS = (
 )
 EMAIL_DAILY_LIMIT = 20
 WHATSAPP_DAILY_LIMIT = 5
+BUYER_SECTOR_EVIDENCE = {
+    "mining": {"mine operator", "mineral processing", "mining operations", "mining fleet"},
+    "transport_logistics": {"trucking", "haulage", "logistics fleet", "transport fleet", "truck fleet"},
+    "shipping_ports": {"marine fleet", "port operator", "vessel fleet", "shipping company"},
+    "construction": {"construction equipment", "earthmoving", "heavy equipment fleet"},
+    "power_generation": {"power plant", "backup generator", "power generation"},
+    "cement_manufacturing": {"cement plant", "cement manufacturing"},
+}
 UTC_TODAY = dt.datetime.now(dt.timezone.utc).date().isoformat()
 
 
@@ -111,6 +119,29 @@ def _values(row: dict, *keys: str) -> list[str]:
 
 def _suppressed(row: dict) -> bool:
     return _true(row.get("do_not_contact")) or _true(row.get("unsubscribed"))
+
+
+def _qualified_buyer_row(row: dict) -> bool:
+    if str(row.get("buyer_type") or "").strip().lower() != "direct_diesel_evidence":
+        return False
+    if not _values(row, "diesel_evidence_terms"):
+        return False
+    raw = row.get("sector_evidence") or ""
+    if isinstance(raw, dict):
+        evidence = raw
+    else:
+        try:
+            evidence = json.loads(str(raw))
+        except (TypeError, ValueError):
+            return False
+    if not isinstance(evidence, dict):
+        return False
+    return any(
+        sector in BUYER_SECTOR_EVIDENCE
+        and bool(set(str(term).lower() for term in (terms or [])) & allowed)
+        for sector, terms in evidence.items()
+        for allowed in [BUYER_SECTOR_EVIDENCE.get(sector, set())]
+    )
 
 
 def _verified_whatsapp_numbers(row: dict) -> list[str]:
@@ -222,17 +253,17 @@ def main() -> int:
     rows = _read_leads()
     email_sent = _daily_count(rows, "email")
     wa_sent = _daily_count(rows, "whatsapp")
-    email_eligible = sum(1 for row in rows if _true(row.get("email_outreach_eligible")) and not _suppressed(row))
+    email_eligible = sum(1 for row in rows if _qualified_buyer_row(row) and _true(row.get("email_outreach_eligible")) and not _suppressed(row))
     email_ready = sum(
         1 for row in rows
-        if _true(row.get("email_outreach_eligible")) and not _suppressed(row)
+        if _qualified_buyer_row(row) and _true(row.get("email_outreach_eligible")) and not _suppressed(row)
         and _values(row, "commercial_emails", "email")
         and str(row.get("email_send_status") or "").strip().lower() not in {"sent", "queued", "sending"}
     )
-    whatsapp_opted_in = sum(1 for row in rows if _true(row.get("whatsapp_opt_in")) and not _suppressed(row))
+    whatsapp_opted_in = sum(1 for row in rows if _qualified_buyer_row(row) and _true(row.get("whatsapp_opt_in")) and not _suppressed(row))
     whatsapp_ready = sum(
         1 for row in rows
-        if _true(row.get("whatsapp_opt_in")) and not _suppressed(row)
+        if _qualified_buyer_row(row) and _true(row.get("whatsapp_opt_in")) and not _suppressed(row)
         and _verified_whatsapp_numbers(row)
         and str(row.get("whatsapp_send_status") or "").strip().lower() not in {"sent", "queued", "sending"}
     )
@@ -243,12 +274,12 @@ def main() -> int:
     phone_contact_rows = sum(bool(_values(row, "business_phones", "phone")) for row in rows)
     whatsapp_contact_rows = sum(bool(_values(row, "whatsapp_numbers", "whatsapp")) for row in rows)
     email_blocked_no_approval = sum(
-        1 for row in rows if _values(row, "commercial_emails", "email")
+        1 for row in rows if _qualified_buyer_row(row) and _values(row, "commercial_emails", "email")
         and not _true(row.get("email_outreach_eligible")) and not _suppressed(row)
     )
     whatsapp_blocked_no_optin = sum(
-        1 for row in rows if _values(row, "whatsapp_numbers", "whatsapp")
-        and not _true(row.get("whatsapp_opt_in")) and not _suppressed(row)
+        1 for row in rows if _verified_whatsapp_numbers(row)
+        and _qualified_buyer_row(row) and not _true(row.get("whatsapp_opt_in")) and not _suppressed(row)
     )
     print(
         f"CONTACT_INVENTORY rows={len(rows)} "
@@ -271,7 +302,7 @@ def main() -> int:
 
     now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     for row in rows:
-        if _suppressed(row):
+        if _suppressed(row) or not _qualified_buyer_row(row):
             continue
         website = str(row.get("website") or row.get("discovered_url") or "").strip()
         if not website:
