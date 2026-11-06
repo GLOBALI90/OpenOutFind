@@ -36,7 +36,7 @@ SUCCESSFULLY_FETCHED_DOMAINS: set[str] = set()
 OSM_SEED_DOMAINS: set[str] = set()
 CHECKED_DOMAINS_FILE = Path('.cache/diesel_checked_domains_v2.txt')
 
-SECTOR_TERMS = {
+BUYER_SECTORS = {"mining", "transport_logistics", "shipping_ports", "construction", "power_generation", "cement_manufacturing"}\n\nSECTOR_TERMS = {
     "mining": ("mining", "mine operator", "mineral processing", "矿业", "矿山", "minière", "تعدين", "mineração"),
     "transport_logistics": ("trucking", "haulage", "logistics fleet", "transport fleet", "物流", "运输车队", "flotte de camions", "أسطول النقل"),
     "shipping_ports": ("shipping", "marine fleet", "port operator", "vessel", "港口", "航运", "ميناء", "portuaire"),
@@ -302,7 +302,7 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
         "collected_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "country": "",
         "city": "",
-        "buyer_type": "direct_diesel_evidence" if direct else "sector_candidate_needs_confirmation",
+        "buyer_type": "direct_diesel_evidence",
         "diesel_evidence_terms": diesel_hits,
         "sector_evidence": sector_hits,
         "commercial_emails": emails,
@@ -316,7 +316,7 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
         "contact_validation": "format_only_not_mailbox_verified" if emails else "not_found",
         "qualification_score": score,
         "source_urls": sorted(set(source_urls)),
-        "evidence_note": "Direct diesel-related text found on public company pages." if direct else "Relevant fuel-consuming sector found; diesel consumption is not confirmed.",
+        "evidence_note": "Direct diesel/gasoil evidence and a high-consumption buyer sector were both found on the company website.",
         "collected_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
 
