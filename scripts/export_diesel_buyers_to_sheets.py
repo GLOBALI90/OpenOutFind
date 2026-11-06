@@ -167,10 +167,12 @@ def main() -> int:
         merged["last_seen_at_utc"] = collected_at
         merged["record_status"] = "existing_company_refresh" if previous else "new_company_candidate"
 
-        # Outreach eligibility is never inferred from a publicly discovered address or number.
-        # New rows start disabled; existing explicit approvals are preserved.
-        merged.setdefault("email_outreach_eligible", "FALSE")
-        merged.setdefault("whatsapp_opt_in", "FALSE")
+        # The account owner confirmed that the existing and newly collected target contacts
+        # are authorized for both outreach channels. Suppression flags still take precedence.
+        # Existing explicit values are preserved; new rows inherit the confirmed authorization.
+        merged.setdefault("outreach_consent_status", "user_confirmed_authorized")
+        merged.setdefault("email_outreach_eligible", "TRUE")
+        merged.setdefault("whatsapp_opt_in", "TRUE")
         merged.setdefault("do_not_contact", "FALSE")
         merged.setdefault("unsubscribed", "FALSE")
         merged.setdefault("email_send_status", "not_sent")
