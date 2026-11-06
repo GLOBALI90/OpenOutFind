@@ -164,22 +164,16 @@ def _fetch(url: str) -> tuple[str, PageParser] | None:
         return None
 
 def _normalise_phone(raw: str) -> str:
-    value = re.sub(r"[^\\d+]", "", raw)
+    value = re.sub(r"[^\d+]", "", raw)
     if value.startswith("00"):
         value = "+" + value[2:]
-    digits = re.sub(r"\\D", "", value)
+    digits = re.sub(r"\D", "", value)
     # Reject IDs, timestamps, dates, short extensions and implausibly long digit runs.
     if not 8 <= len(digits) <= 15 or len(set(digits)) == 1:
         return ""
-    if re.fullmatch(r"(?:19|20)\\d{6}", digits):
+    if re.fullmatch(r"(?:19|20)\d{6}", digits):
         return ""
     return ("+" + digits) if value.startswith("+") else digits
-
-
-def _is_qualified_buyer(diesel_hits: list[str], sector_hits: dict[str, list[str]]) -> bool:
-    # A sector match alone is not buying evidence. Require both explicit diesel/gasoil
-    # evidence on the company's own pages and a high-consumption operating sector.
-    return bool(diesel_hits) and bool(BUYER_SECTORS.intersection(sector_hits))
 
 
 def _contact_data(text: str, links: list[str]) -> tuple[list[str], list[str], list[str], str, list[str]]:
@@ -272,14 +266,16 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
 
     combined = " ".join(all_text).lower()
     diesel_hits = sorted({term for term in DIESEL_TERMS if term in combined})
-    sector_hits = {
-        sector: sorted({term for term in terms if term in combined})
-        for sector, terms in SECTOR_TERMS.items()
+    qualified_sectors = {
+        key: values for key, values in sector_hits.items() if key in BUYER_SECTORS
     }
-    sector_hits = {k: v for k, v in sector_hits.items() if v}
-    if not diesel_hits and not sector_hits:
-        print(f"REJECT_NOT_RELEVANT domain={host} pages_fetched={len(source_urls)} diesel_hits=0 sector_hits=0")
+    if not _is_qualified_buyer(diesel_hits, qualified_sectors):
+        print(
+            f"REJECT_NOT_QUALIFIED_BUYER domain={host} pages_fetched={len(source_urls)} "
+            f"diesel_hits={len(diesel_hits)} buyer_sector_hits={len(qualified_sectors)}"
+        )
         return None
+    sector_hits = qualified_sectors
 
     emails, phones, whatsapp, wa_status, wa_evidence = _contact_data(" ".join(all_text), all_links)
     direct = bool(diesel_hits)
