@@ -23,7 +23,7 @@ from pathlib import Path
 
 USER_AGENT = "RozhanDieselBuyerResearch/0.1 (+public-company-research; contact: admin@example.invalid)"
 EMAIL_RE = re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
-PHONE_RE = re.compile(r"(?<!\\w)\\+?\\d(?:[\\d\\s().-]{5,22}\\d)(?!\\w)")
+PHONE_RE = re.compile(r"(?<!\w)\+?\d(?:[\d\s().-]{5,22}\d)(?!\w)")
 DIESEL_TERMS = (
     "diesel", "gasoil", "gas oil", "diesel fuel", "diesel generator",
     "diesel-powered", "diesel powered", "fuel procurement",
@@ -36,7 +36,9 @@ SUCCESSFULLY_FETCHED_DOMAINS: set[str] = set()
 OSM_SEED_DOMAINS: set[str] = set()
 CHECKED_DOMAINS_FILE = Path('.cache/diesel_checked_domains_v2.txt')
 
-BUYER_SECTORS = {"mining", "transport_logistics", "shipping_ports", "construction", "power_generation", "cement_manufacturing"}\n\nSECTOR_TERMS = {
+BUYER_SECTORS = {"mining", "transport_logistics", "shipping_ports", "construction", "power_generation", "cement_manufacturing"}
+
+SECTOR_TERMS = {
     "mining": ("mining", "mine operator", "mineral processing", "矿业", "矿山", "minière", "تعدين", "mineração"),
     "transport_logistics": ("trucking", "haulage", "logistics fleet", "transport fleet", "物流", "运输车队", "flotte de camions", "أسطول النقل"),
     "shipping_ports": ("shipping", "marine fleet", "port operator", "vessel", "港口", "航运", "ميناء", "portuaire"),
