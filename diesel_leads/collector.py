@@ -23,7 +23,7 @@ from pathlib import Path
 
 USER_AGENT = "RozhanDieselBuyerResearch/0.1 (+public-company-research; contact: admin@example.invalid)"
 EMAIL_RE = re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
-PHONE_RE = re.compile(r"(?<!\w)(?:\+?\d[\d\s().-]{7,}\d)(?!\w)")
+PHONE_RE = re.compile(r"(?<!\\w)\\+?\\d(?:[\\d\\s().-]{5,22}\\d)(?!\\w)")
 DIESEL_TERMS = (
     "diesel", "gasoil", "gas oil", "diesel fuel", "diesel generator",
     "diesel-powered", "diesel powered", "fuel procurement",
@@ -162,10 +162,22 @@ def _fetch(url: str) -> tuple[str, PageParser] | None:
         return None
 
 def _normalise_phone(raw: str) -> str:
-    value = re.sub(r"[^\d+]", "", raw)
+    value = re.sub(r"[^\\d+]", "", raw)
     if value.startswith("00"):
         value = "+" + value[2:]
-    return value if len(re.sub(r"\D", "", value)) >= 8 else ""
+    digits = re.sub(r"\\D", "", value)
+    # Reject IDs, timestamps, dates, short extensions and implausibly long digit runs.
+    if not 8 <= len(digits) <= 15 or len(set(digits)) == 1:
+        return ""
+    if re.fullmatch(r"(?:19|20)\\d{6}", digits):
+        return ""
+    return ("+" + digits) if value.startswith("+") else digits
+
+
+def _is_qualified_buyer(diesel_hits: list[str], sector_hits: dict[str, list[str]]) -> bool:
+    # A sector match alone is not buying evidence. Require both explicit diesel/gasoil
+    # evidence on the company's own pages and a high-consumption operating sector.
+    return bool(diesel_hits) and bool(BUYER_SECTORS.intersection(sector_hits))
 
 
 def _contact_data(text: str, links: list[str]) -> tuple[list[str], list[str], list[str], str, list[str]]:
