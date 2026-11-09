@@ -26,10 +26,12 @@ EMAIL_RE = re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
 PHONE_RE = re.compile(r"(?<!\w)\+?\d(?:[\d\s().-]{5,22}\d)(?!\w)")
 DIESEL_TERMS = (
     "diesel", "gasoil", "gas oil", "diesel fuel", "diesel generator",
-    "diesel-powered", "diesel powered", "fuel procurement",
-    "柴油", "柴油燃料", "燃料采购", "柴油采购",
-    "carburant diesel", "achat de gasoil", "combustível diesel",
-    "وقود الديزل", "شراء الديزل",
+    "diesel-powered", "diesel powered", "diesel genset", "diesel fuel supply",
+    "fuel procurement", "fuel supply", "diesel consumption", "diesel fleet",
+    "柴油", "柴油燃料", "燃料采购", "柴油采购", "柴油发电机", "柴油机组",
+    "carburant diesel", "achat de gasoil", "groupe électrogène diesel",
+    "combustível diesel", "gasóleo", "gerador a diesel",
+    "وقود الديزل", "شراء الديزل", "مولدات الديزل", "زيت الغاز",
 )
 EXISTING_COMPANY_DOMAINS: set[str] = set()
 SUCCESSFULLY_FETCHED_DOMAINS: set[str] = set()
@@ -37,22 +39,21 @@ OSM_SEED_DOMAINS: set[str] = set()
 CHECKED_DOMAINS_FILE = Path('.cache/diesel_checked_domains_v2.txt')
 
 BUYER_SECTOR_TERMS = {
-    "mining": ("mine operator", "mineral processing", "mining operations", "mining fleet"),
-    "transport_logistics": ("trucking", "haulage", "logistics fleet", "transport fleet", "truck fleet"),
-    "shipping_ports": ("marine fleet", "port operator", "vessel fleet", "shipping company"),
-    "construction": ("construction equipment", "earthmoving", "heavy equipment fleet"),
-    "power_generation": ("power plant", "backup generator", "power generation"),
-    "cement_manufacturing": ("cement plant", "cement manufacturing"),
-}
-
-SECTOR_TERMS = {
     "mining": ("mining", "mine operator", "mineral processing", "矿业", "矿山", "minière", "تعدين", "mineração"),
     "transport_logistics": ("trucking", "haulage", "logistics fleet", "transport fleet", "物流", "运输车队", "flotte de camions", "أسطول النقل"),
     "shipping_ports": ("shipping", "marine fleet", "port operator", "vessel", "港口", "航运", "ميناء", "portuaire"),
     "construction": ("construction equipment", "earthmoving", "heavy equipment", "工程机械", "重型设备", "équipement lourd"),
     "power_generation": ("power plant", "backup generator", "power generation", "发电厂", "发电", "محطة توليد الكهرباء", "centrale électrique"),
     "cement_manufacturing": ("cement plant", "cement manufacturing", "industrial manufacturing", "水泥厂", "水泥制造", "cimenterie"),
-    "agriculture": ("agricultural machinery", "farm equipment", "agriculture", "农业机械", "machinerie agricole"),
+    "agriculture": ("agricultural machinery", "farm equipment", "agriculture", "农业机械", "machinerie agricole", "زراعة"),
+    "oilfield_services": ("oilfield services", "drilling contractor", "well services", "油田", "خدمات حقول النفط", "services pétroliers"),
+    "generator_rental": ("generator rental", "genset rental", "power rental", "柴油发电机组租赁", "تأجير مولدات"),
+    "telecom_power": ("telecom tower", "cell tower", "mobile network tower", "通信基站", "أبراج الاتصالات"),
+    "rail_freight": ("rail freight", "diesel locomotive", "railway operator", "铁路", "locomotive diesel"),
+    "airport_ground_ops": ("ground handling", "airport ground support equipment", "机场地勤", "مناولة أرضية"),
+    "waste_management": ("waste collection fleet", "municipal truck fleet", "waste management", "垃圾运输", "إدارة النفايات"),
+    "data_centres": ("data centre", "data center", "backup power", "数据中心", "مركز بيانات"),
+    "industrial_manufacturing": ("industrial plant", "manufacturing facility", "factory operations", "工厂", "مصنع صناعي"),
 }
 CONTACT_PATH_HINTS = ("contact", "about", "company", "location", "procurement", "fuel", "fleet", "operations", "services", "projects", "facilities", "energy", "business")
 
