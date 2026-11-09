@@ -1,8 +1,8 @@
-"""Consent-gated manual email and WhatsApp outreach for approved Leads rows.
+"""Consent-gated outreach without buyer-sector qualification filters.
 
-Email requires email_outreach_eligible=TRUE.
-WhatsApp requires whatsapp_opt_in=TRUE and an explicitly captured WhatsApp number.
-Both channels honor do_not_contact/unsubscribed and enforce daily caps.
+Email requires explicit email eligibility and a valid email address.
+WhatsApp requires explicit opt-in and a confirmed WhatsApp number.
+Both channels honor do_not_contact/unsubscribed, prior-send status, and daily caps.
 """
 from __future__ import annotations
 
@@ -254,17 +254,17 @@ def main() -> int:
     rows = _read_leads()
     email_sent = _daily_count(rows, "email")
     wa_sent = _daily_count(rows, "whatsapp")
-    email_eligible = sum(1 for row in rows if _qualified_buyer_row(row) and _true(row.get("email_outreach_eligible")) and not _suppressed(row))
+    email_eligible = sum(1 for row in rows if _true(row.get("email_outreach_eligible")) and not _suppressed(row))
     email_ready = sum(
         1 for row in rows
-        if _qualified_buyer_row(row) and _true(row.get("email_outreach_eligible")) and not _suppressed(row)
-        and _values(row, "commercial_emails", "email")
+        if _true(row.get("email_outreach_eligible")) and not _suppressed(row)
+        and any(re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", value) for value in _values(row, "commercial_emails", "email"))
         and str(row.get("email_send_status") or "").strip().lower() not in {"sent", "queued", "sending"}
     )
-    whatsapp_opted_in = sum(1 for row in rows if _qualified_buyer_row(row) and _true(row.get("whatsapp_opt_in")) and not _suppressed(row))
+    whatsapp_opted_in = sum(1 for row in rows if _true(row.get("whatsapp_opt_in")) and not _suppressed(row))
     whatsapp_ready = sum(
         1 for row in rows
-        if _qualified_buyer_row(row) and _true(row.get("whatsapp_opt_in")) and not _suppressed(row)
+        if _true(row.get("whatsapp_opt_in")) and not _suppressed(row)
         and _verified_whatsapp_numbers(row)
         and str(row.get("whatsapp_send_status") or "").strip().lower() not in {"sent", "queued", "sending"}
     )
@@ -275,12 +275,12 @@ def main() -> int:
     phone_contact_rows = sum(bool(_values(row, "business_phones", "phone")) for row in rows)
     whatsapp_contact_rows = sum(bool(_verified_whatsapp_numbers(row)) for row in rows)
     email_blocked_no_approval = sum(
-        1 for row in rows if _qualified_buyer_row(row) and _values(row, "commercial_emails", "email")
+        1 for row in rows if _values(row, "commercial_emails", "email")
         and not _true(row.get("email_outreach_eligible")) and not _suppressed(row)
     )
     whatsapp_blocked_no_optin = sum(
         1 for row in rows if _verified_whatsapp_numbers(row)
-        and _qualified_buyer_row(row) and not _true(row.get("whatsapp_opt_in")) and not _suppressed(row)
+        and not _true(row.get("whatsapp_opt_in")) and not _suppressed(row)
     )
     print(
         f"CONTACT_INVENTORY rows={len(rows)} "
@@ -307,7 +307,7 @@ def main() -> int:
 
     now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     for row in rows:
-        if _suppressed(row) or not _qualified_buyer_row(row):
+        if _suppressed(row):
             continue
         website = str(row.get("website") or row.get("discovered_url") or "").strip()
         if not website:
@@ -317,7 +317,11 @@ def main() -> int:
             prior = str(row.get("email_send_status") or "").strip().lower()
             recipients = _values(row, "commercial_emails", "email")
             if prior not in {"sent", "queued", "sending"} and recipients:
-                recipient = recipients[0]
+                valid_recipients = [value for value in recipients if re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", value)]
+                if not valid_recipients:
+                    print(f"EMAIL_SKIPPED_INVALID_ADDRESS website={website}")
+                    continue
+                recipient = valid_recipients[0]
                 try:
                     row["email_send_status"] = "sending"
                     row["email_send_started_at_utc"] = now
