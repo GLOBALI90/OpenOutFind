@@ -316,7 +316,7 @@ def main() -> int:
         if args.email and email_sent < EMAIL_DAILY_LIMIT and _true(row.get("email_outreach_eligible")):
             prior = str(row.get("email_send_status") or "").strip().lower()
             recipients = _values(row, "commercial_emails", "email")
-            valid_recipients = [value for value in recipients if re.fullmatch(r"[^\\s@]+@[^\\s@]+\\.[^\\s@]+", value)]
+            valid_recipients = [value for value in recipients if re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", value)]
             if prior not in {"sent", "queued", "sending"} and valid_recipients:
                 recipient = valid_recipients[0]
                 try:
