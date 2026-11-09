@@ -316,13 +316,9 @@ def main() -> int:
         if args.email and email_sent < EMAIL_DAILY_LIMIT and _true(row.get("email_outreach_eligible")):
             prior = str(row.get("email_send_status") or "").strip().lower()
             recipients = _values(row, "commercial_emails", "email")
-            valid_recipients = [value for value in recipients if re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", value)]
+            valid_recipients = [value for value in recipients if re.fullmatch(r"[^\\s@]+@[^\\s@]+\\.[^\\s@]+", value)]
             if prior not in {"sent", "queued", "sending"} and valid_recipients:
                 recipient = valid_recipients[0]
-            elif recipients and not valid_recipients:
-                print(f"EMAIL_SKIPPED_INVALID_ADDRESS website={website}")
-            else:
-                recipient = ""
                 try:
                     row["email_send_status"] = "sending"
                     row["email_send_started_at_utc"] = now
@@ -339,6 +335,8 @@ def main() -> int:
                     row["email_send_error"] = f"{type(exc).__name__}: {exc}"[:300]
                     _save_row(row)
                     print(f"EMAIL_FAILED website={website} reason={type(exc).__name__}")
+            elif recipients and not valid_recipients:
+                print(f"EMAIL_SKIPPED_INVALID_ADDRESS website={website}")
 
         if args.whatsapp and wa_sent < WHATSAPP_DAILY_LIMIT and _true(row.get("whatsapp_opt_in")):
             prior = str(row.get("whatsapp_send_status") or "").strip().lower()
