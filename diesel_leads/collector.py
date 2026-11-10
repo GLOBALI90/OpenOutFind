@@ -102,6 +102,27 @@ def _domain_key(value: str) -> str:
     return host
 
 
+def ordered_unique_seeds(seed_files: list[Path]) -> list[str]:
+    ordered: list[str] = []
+    seen_urls: set[str] = set()
+    seen_domains: set[str] = set()
+    for seed_file in seed_files:
+        if not seed_file.exists():
+            continue
+        for raw in seed_file.read_text(encoding="utf-8").splitlines():
+            seed = raw.strip()
+            if not seed or seed.startswith("#") or not _public_http_url(seed):
+                continue
+            url_key = urllib.parse.urldefrag(seed)[0].rstrip("/").lower()
+            domain_key = _domain_key(seed)
+            if not domain_key or url_key in seen_urls or domain_key in seen_domains:
+                continue
+            seen_urls.add(url_key)
+            seen_domains.add(domain_key)
+            ordered.append(seed)
+    return ordered
+
+
 def read_existing_company_domains() -> set[str]:
     """Read the durable Leads tab before collection so known companies are recognised."""
     endpoint = os.environ.get("GOOGLE_SHEETS_API_URL", "").strip()
@@ -141,7 +162,7 @@ def _robots_parser(base_url: str) -> urllib.robotparser.RobotFileParser:
     parser.set_url(robots_url)
     try:
         request = urllib.request.Request(robots_url, headers={"User-Agent": USER_AGENT})
-        with urllib.request.urlopen(request, timeout=8) as response:
+        with urllib.request.urlopen(request, timeout=3) as response:
             parser.parse(response.read(256_000).decode("utf-8", "replace").splitlines())
     except Exception:
         # If robots.txt cannot be read, fail closed for this pilot.
@@ -158,11 +179,11 @@ def _fetch(url: str) -> tuple[str, PageParser] | None:
         safe_query = urllib.parse.quote(parsed.query, safe="=&?/:;+,%@!$'()*,-._~")
         safe_url = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, safe_path, safe_query, ""))
         request = urllib.request.Request(safe_url, headers={"User-Agent": USER_AGENT, "Accept": "text/html"})
-        with urllib.request.urlopen(request, timeout=12) as response:
+        with urllib.request.urlopen(request, timeout=6) as response:
             content_type = response.headers.get_content_type()
             if content_type not in {"text/html", "application/xhtml+xml"}:
                 return None
-            body = response.read(1_500_000).decode(response.headers.get_content_charset() or "utf-8", "replace")
+            body = response.read(750_000).decode(response.headers.get_content_charset() or "utf-8", "replace")
             parser = PageParser()
             parser.feed(body)
             return response.geturl(), parser
@@ -275,7 +296,7 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
             if (link.hostname or "").lower() == host and any(h in link.path.lower() for h in CONTACT_PATH_HINTS):
                 if absolute not in visited and absolute not in queue:
                     queue.append(absolute)
-        time.sleep(1.0)
+        time.sleep(0.25)
 
     combined = " ".join(all_text).lower()
     diesel_hits = sorted({term for term in DIESEL_TERMS if term in combined})
@@ -348,67 +369,79 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--seeds", required=True, help="Text file containing one public company/directory URL per line")
+    parser.add_argument("--seeds", required=True)
     parser.add_argument("--market", default="China", choices=("China", "Africa"))
-    parser.add_argument("--max-pages", type=int, default=5)
+    parser.add_argument("--max-pages", type=int, default=3)
+    parser.add_argument("--max-domains", type=int, default=90)
+    parser.add_argument("--max-seconds", type=int, default=2100)
     parser.add_argument("--output", default="diesel_leads.jsonl")
-    parser.add_argument("--target-new", type=int, default=10, help="Stop after this many genuinely new companies; existing domains are skipped.")
+    parser.add_argument("--target-new", type=int, default=10)
     args = parser.parse_args()
     global EXISTING_COMPANY_DOMAINS, OSM_SEED_DOMAINS
     EXISTING_COMPANY_DOMAINS = read_existing_company_domains()
     osm_domains_file = Path(".cache/osm_seed_domains.txt")
     if osm_domains_file.exists():
-        OSM_SEED_DOMAINS = {
-            line.strip().lower().removeprefix("www.")
-            for line in osm_domains_file.read_text(encoding="utf-8").splitlines()
-            if line.strip() and not line.lstrip().startswith("#")
-        }
+        OSM_SEED_DOMAINS = {line.strip().lower().removeprefix("www.") for line in osm_domains_file.read_text(encoding="utf-8").splitlines() if line.strip() and not line.lstrip().startswith("#")}
     print(f"OSM_SEED_PROVENANCE_LOADED domains={len(OSM_SEED_DOMAINS)}")
     print(f"EXISTING_LEADS_READ count={len(EXISTING_COMPANY_DOMAINS)} tab=Leads")
+    seeds = ordered_unique_seeds([Path(args.seeds)])
+    print(f"SEED_QUEUE_READY unique_company_domains={len(seeds)}")
     rows: dict[str, dict] = {}
-    for line in Path(args.seeds).read_text(encoding="utf-8").splitlines():
-        seed = line.strip()
-        if not seed or seed.startswith("#"):
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("", encoding="utf-8")
+    started = time.monotonic()
+    deadline = started + max(60, args.max_seconds)
+    domains_started = 0
+    skipped_existing = 0
+
+    def write_checkpoint() -> None:
+        temp_path = output_path.with_suffix(output_path.suffix + ".tmp")
+        with temp_path.open("w", encoding="utf-8") as handle:
+            for item in rows.values():
+                handle.write(json.dumps(item, ensure_ascii=False) + "\n")
+        temp_path.replace(output_path)
+
+    for index, seed in enumerate(seeds, start=1):
+        if len(rows) >= max(1, args.target_new):
+            print(f"TARGET_REACHED new_candidates={len(rows)}")
+            break
+        if domains_started >= max(1, args.max_domains):
+            print(f"DOMAIN_LIMIT_REACHED inspected={domains_started} limit={args.max_domains}")
+            break
+        if time.monotonic() >= deadline:
+            print(f"TIME_BUDGET_REACHED elapsed_seconds={int(time.monotonic()-started)} candidates={len(rows)}")
+            break
+        domain = _domain_key(seed)
+        if not domain:
             continue
-        row = collect_company(seed, args.market, max(1, min(args.max_pages, 10)))
+        if domain in EXISTING_COMPANY_DOMAINS:
+            skipped_existing += 1
+            print(f"SKIP_EXISTING_DOMAIN domain={domain}")
+            continue
+        domains_started += 1
+        print(f"DOMAIN_START index={domains_started}/{args.max_domains} seed_index={index}/{len(seeds)} domain={domain}")
+        row = collect_company(seed, args.market, max(1, min(args.max_pages, 5)))
         if row:
             if row["website_domain"] in EXISTING_COMPANY_DOMAINS:
+                skipped_existing += 1
                 print(f"SKIP_EXISTING_DOMAIN domain={row['website_domain']}")
                 continue
             row["record_status"] = "new_company_candidate"
             row["previously_in_leads"] = False
             rows[row["lead_key"]] = row
-            if len(rows) >= max(1, args.target_new):
-                print(f"TARGET_REACHED new_candidates={len(rows)}")
-                break
-    # Report contact discovery as counts only; never print harvested personal contact values.
-    all_emails = {value for row in rows.values() for value in row.get("commercial_emails", []) if value}
-    all_phones = {value for row in rows.values() for value in row.get("business_phones", []) if value}
-    all_whatsapp = {value for row in rows.values() for value in row.get("whatsapp_numbers", []) if value}
-    print(
-        f"CONTACT_EXTRACTION_SUMMARY candidates={len(rows)} "
-        f"companies_with_email={sum(bool(row.get('commercial_emails')) for row in rows.values())} "
-        f"unique_emails={len(all_emails)} "
-        f"companies_with_phone={sum(bool(row.get('business_phones')) for row in rows.values())} "
-        f"unique_phone_numbers={len(all_phones)} "
-        f"companies_with_whatsapp={sum(bool(row.get('whatsapp_numbers')) for row in rows.values())} "
-        f"unique_whatsapp_numbers={len(all_whatsapp)}"
-    )
-    with Path(args.output).open("w", encoding="utf-8") as handle:
-        for row in rows.values():
-            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
-    CHECKED_DOMAINS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    checked = set()
-    if CHECKED_DOMAINS_FILE.exists():
-        checked.update(line.strip() for line in CHECKED_DOMAINS_FILE.read_text(encoding="utf-8").splitlines() if line.strip())
-    checked.update(SUCCESSFULLY_FETCHED_DOMAINS)
-    CHECKED_DOMAINS_FILE.write_text("\n".join(sorted(checked)) + ("\n" if checked else ""), encoding="utf-8")
-    print(f"CRAWL_DIAGNOSTICS fetched_domains={len(SUCCESSFULLY_FETCHED_DOMAINS)} checked_domains_total={len(checked)}")
-    existing_count = sum(1 for row in rows.values() if row.get("previously_in_leads"))
-    print(
-        f"Collected {len(rows)} unique company record(s): "
-        f"{len(rows) - existing_count} new candidate(s), {existing_count} existing company refresh(es)."
-    )
+            write_checkpoint()
+            print(f"COMPANY_CHECKPOINT_SAVED domain={row['website_domain']} candidates={len(rows)} emails={len(row.get('commercial_emails', []))} phones={len(row.get('business_phones', []))} whatsapp={len(row.get('whatsapp_numbers', []))}")
+        if domains_started % 10 == 0:
+            print(f"CRAWL_PROGRESS inspected={domains_started} candidates={len(rows)} elapsed_seconds={int(time.monotonic()-started)}")
+    write_checkpoint()
+    all_emails = {v for row in rows.values() for v in row.get("commercial_emails", []) if v}
+    all_phones = {v for row in rows.values() for v in row.get("business_phones", []) if v}
+    all_whatsapp = {v for row in rows.values() for v in row.get("whatsapp_numbers", []) if v}
+    print(f"CONTACT_EXTRACTION_SUMMARY candidates={len(rows)} companies_with_email={sum(bool(row.get('commercial_emails')) for row in rows.values())} unique_emails={len(all_emails)} companies_with_phone={sum(bool(row.get('business_phones')) for row in rows.values())} unique_phone_numbers={len(all_phones)} companies_with_whatsapp={sum(bool(row.get('whatsapp_numbers')) for row in rows.values())} unique_whatsapp_numbers={len(all_whatsapp)}")
+    print(f"CRAWL_DIAGNOSTICS inspected_domains={domains_started} successful_domains={len(SUCCESSFULLY_FETCHED_DOMAINS)} skipped_existing={skipped_existing} elapsed_seconds={int(time.monotonic()-started)}")
+    print(f"PARTIAL_RESULTS_CHECKPOINTED path={output_path} candidates={len(rows)}")
+    print(f"Collected {len(rows)} unique company record(s): {len(rows)} new candidate(s).")
     return 0
 
 
