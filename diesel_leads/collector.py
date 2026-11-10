@@ -147,7 +147,7 @@ def read_existing_company_domains() -> set[str]:
     for row in result["rows"]:
         if not isinstance(row, dict):
             continue
-        for field in ("website", "discovered_url"):
+        for field in ("website", "discovered_url", "website_domain"):
             domain = _domain_key(str(row.get(field) or ""))
             if domain:
                 domains.add(domain)
@@ -207,7 +207,7 @@ def _normalise_phone(raw: str) -> str:
 
 def _is_qualified_buyer(diesel_hits: list[str], sector_hits: dict[str, list[str]]) -> bool:
     # Require explicit diesel/gasoil evidence and a specific high-consumption sector phrase.
-    return bool(diesel_hits) and any(values for key, values in sector_hits.items() if key in BUYER_SECTOR_TERMS)
+    return bool(diesel_hits) and any(any(term in BUYER_SECTOR_TERMS.get(key, ()) for term in values) for key, values in sector_hits.items())
 
 
 def _contact_data(text: str, links: list[str]) -> tuple[list[str], list[str], list[str], str, list[str]]:
