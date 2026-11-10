@@ -45,7 +45,7 @@ BUYER_SECTOR_TERMS = {
     "construction": ("construction equipment", "earthmoving", "heavy equipment", "工程机械", "重型设备", "équipement lourd"),
     "power_generation": ("power plant", "backup generator", "power generation", "发电厂", "发电", "محطة توليد الكهرباء", "centrale électrique"),
     "cement_manufacturing": ("cement plant", "cement manufacturing", "industrial manufacturing", "水泥厂", "水泥制造", "cimenterie"),
-    "agriculture": ("agricultural machinery", "farm equipment", "agriculture", "农业机械", "machinerie agricole", "زراعة"),
+    "agriculture": ("agricultural machinery", "farm equipment", "commercial farming", "irrigation pump", "tractor fleet", "农业机械", "machinerie agricole", "زراعة"),
     "oilfield_services": ("oilfield services", "drilling contractor", "well services", "油田", "خدمات حقول النفط", "services pétroliers"),
     "generator_rental": ("generator rental", "genset rental", "power rental", "柴油发电机组租赁", "تأجير مولدات"),
     "telecom_power": ("telecom tower", "cell tower", "mobile network tower", "通信基站", "أبراج الاتصالات"),
