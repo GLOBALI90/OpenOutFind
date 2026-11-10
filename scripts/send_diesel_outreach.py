@@ -312,6 +312,8 @@ def main() -> int:
         website = str(row.get("website") or row.get("discovered_url") or "").strip()
         if not website:
             continue
+        # Sheets upserts by "website"; older rows may only have discovered_url.
+        row["website"] = website
 
         if args.email and email_sent < EMAIL_DAILY_LIMIT and _true(row.get("email_outreach_eligible")):
             prior = str(row.get("email_send_status") or "").strip().lower()
@@ -319,22 +321,44 @@ def main() -> int:
             valid_recipients = [value for value in recipients if re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", value)]
             if prior not in {"sent", "queued", "sending"} and valid_recipients:
                 recipient = valid_recipients[0]
+                row["email_send_status"] = "sending"
+                row["email_send_started_at_utc"] = now
                 try:
-                    row["email_send_status"] = "sending"
-                    row["email_send_started_at_utc"] = now
+                    # Never send if the pre-send marker cannot be persisted.
                     _save_row(row)
+                except Exception as exc:
+                    print(f"EMAIL_SKIPPED_STATUS_WRITE website={website} reason={type(exc).__name__}: {exc}")
+                    continue
+
+                try:
                     _send_email(row, recipient)
-                    row["email_send_status"] = "sent"
-                    row["email_sent_at_utc"] = now
-                    row["email_sent_to"] = recipient
-                    _save_row(row)
-                    email_sent += 1
-                    print(f"EMAIL_SENT website={website} recipient={recipient}")
                 except Exception as exc:
                     row["email_send_status"] = "failed"
                     row["email_send_error"] = f"{type(exc).__name__}: {exc}"[:300]
-                    _save_row(row)
+                    try:
+                        _save_row(row)
+                    except Exception as save_exc:
+                        print(
+                            f"EMAIL_FAILED_STATUS_SAVE_FAILED website={website} "
+                            f"send_error={type(exc).__name__} save_error={type(save_exc).__name__}"
+                        )
                     print(f"EMAIL_FAILED website={website} reason={type(exc).__name__}")
+                else:
+                    # If this write fails, retain the persisted "sending" marker
+                    # to prevent an automatic retry that could duplicate delivery.
+                    row["email_send_status"] = "sent"
+                    row["email_sent_at_utc"] = now
+                    row["email_sent_to"] = recipient
+                    try:
+                        _save_row(row)
+                    except Exception as exc:
+                        print(
+                            f"EMAIL_SENT_STATUS_SAVE_FAILED website={website} "
+                            f"recipient={recipient} reason={type(exc).__name__}: {exc}"
+                        )
+                    else:
+                        email_sent += 1
+                        print(f"EMAIL_SENT website={website} recipient={recipient}")
             elif recipients and not valid_recipients:
                 print(f"EMAIL_SKIPPED_INVALID_ADDRESS website={website}")
 
