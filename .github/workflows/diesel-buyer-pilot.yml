@@ -33,9 +33,9 @@ on:
         required: true
         type: choice
         options:
+          - "3"
           - "5"
-          - "7"
-        default: "5"
+        default: "3"
       send_email:
         description: "Send approved B2B emails (20/day max; requires email_outreach_eligible=TRUE)"
         required: true
@@ -111,15 +111,6 @@ jobs:
           printf '%s\n' "${MANUAL_SEEDS:-}" > manual_seeds.txt
           : > diesel_seeds.txt
 
-      - name: Restore previously checked website domains
-        uses: actions/cache@v4
-        with:
-          path: .cache/diesel_checked_domains_v2.txt
-          key: diesel-buyer-checked-v2-${{ github.run_id }}
-          restore-keys: |
-            diesel-buyer-checked-v2-
-
-
       - name: Restore cached OpenStreetMap company website seeds
         uses: actions/cache@v4
         with:
@@ -140,16 +131,32 @@ jobs:
           python -m pip install osmium
           python scripts/discover_diesel_buyer_sites.py --market "$MARKET" --limit 120 --output discovered_seeds.txt
           python scripts/discover_osm_industrial_sites.py --market "$MARKET" --output osm_seeds.txt --cache-file ".cache/osm_seeds_$MARKET.txt" --max-age-days 7
-          if [[ -s discovered_seeds.txt ]]; then
-            cat discovered_seeds.txt >> diesel_seeds.txt
-          fi
-          if [[ -s osm_seeds.txt ]]; then
-            cat osm_seeds.txt >> diesel_seeds.txt
-          fi
-          if [[ -s manual_seeds.txt ]]; then
-            cat manual_seeds.txt >> diesel_seeds.txt
-          fi
-          sort -u diesel_seeds.txt -o diesel_seeds.txt
+          # Preserve relevance order: manual URLs, web discoveries, then OSM.
+          python - <<'PY'
+          from pathlib import Path
+          from urllib.parse import urlsplit, urldefrag
+          ordered, seen_urls, seen_domains = [], set(), set()
+          for name in ("manual_seeds.txt", "discovered_seeds.txt", "osm_seeds.txt"):
+              path = Path(name)
+              if not path.exists():
+                  continue
+              for raw in path.read_text(encoding="utf-8").splitlines():
+                  url = raw.strip()
+                  if not url or url.startswith("#"):
+                      continue
+                  parsed = urlsplit(url)
+                  if parsed.scheme not in ("http", "https") or not parsed.hostname:
+                      continue
+                  domain = parsed.hostname.lower().removeprefix("www.")
+                  key = urldefrag(url)[0].rstrip("/").lower()
+                  if key in seen_urls or domain in seen_domains:
+                      continue
+                  seen_urls.add(key)
+                  seen_domains.add(domain)
+                  ordered.append(url)
+          Path("diesel_seeds.txt").write_text("\n".join(ordered) + ("\n" if ordered else ""), encoding="utf-8")
+          print(f"SEED_PRIORITY_ORDER manual_search_osm unique_domains={len(ordered)}")
+          PY
           echo "DISCOVERED_SEED_URLS=$(grep -c '^https\?://' diesel_seeds.txt || true)"
 
       - name: Read existing Leads and collect genuinely new companies
@@ -157,7 +164,7 @@ jobs:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
         run: |
-          python diesel_leads/collector.py --seeds diesel_seeds.txt --market "$MARKET" --max-pages "${{ inputs.max_pages_per_company || '5' }}" --target-new "$TARGET_NEW" --output diesel_leads.jsonl
+          python diesel_leads/collector.py --seeds diesel_seeds.txt --market "$MARKET" --max-pages "${{ inputs.max_pages_per_company || '3' }}" --max-domains 90 --max-seconds 2100 --target-new "$TARGET_NEW" --output diesel_leads.jsonl
 
       - name: Merge new evidence into existing Leads rows
         env:
