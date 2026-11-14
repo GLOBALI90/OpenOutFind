@@ -145,11 +145,9 @@ def _qualified_buyer_row(row: dict) -> bool:
 
 
 def _verified_whatsapp_numbers(row: dict) -> list[str]:
-    # Legacy "whatsapp" values may be ordinary telephone numbers. Only trust the
-    # dedicated field when the collector recorded an explicit wa.me/API link.
-    status = str(row.get("whatsapp_status") or "").strip().lower()
-    if status not in {"explicit_link", "wa_link_confirmed"}:
-        return []
+    # Do not require a separate WhatsApp-link status: some collectors identify
+    # WhatsApp contacts without persisting that metadata. Use only the dedicated
+    # whatsapp_numbers field and retain strict international E.164 validation.
     return [
         number for number in _values(row, "whatsapp_numbers")
         if re.fullmatch(r"\+[1-9]\d{7,14}", number)
