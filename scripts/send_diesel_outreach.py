@@ -299,9 +299,23 @@ def main() -> int:
         return 0
 
     wa_key = os.environ.get("WUAPI_API_KEY", "").strip()
-    wa_account = _wuapi_account_id(wa_key) if args.whatsapp and wa_key else ""
-    if args.whatsapp and not wa_key:
-        raise RuntimeError("WUAPI_API_KEY secret is missing; no WhatsApp messages sent.")
+    wa_account = ""
+    wa_ready = False
+    if args.whatsapp:
+        if not wa_key:
+            print("WHATSAPP_CHANNEL_UNAVAILABLE reason=missing_api_key; email channel will continue")
+        else:
+            try:
+                wa_account = _wuapi_account_id(wa_key)
+            except Exception as exc:
+                # A WhatsApp provider outage must never prevent independent email outreach.
+                print(
+                    f"WHATSAPP_CHANNEL_UNAVAILABLE reason={type(exc).__name__}: {exc}; "
+                    "email channel will continue"
+                )
+            else:
+                wa_ready = True
+                print("WHATSAPP_CHANNEL_READY account_lookup=success")
 
     now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     for row in rows:
@@ -360,7 +374,7 @@ def main() -> int:
             elif recipients and not valid_recipients:
                 print(f"EMAIL_SKIPPED_INVALID_ADDRESS website={website}")
 
-        if args.whatsapp and wa_sent < WHATSAPP_DAILY_LIMIT and _true(row.get("whatsapp_opt_in")):
+        if wa_ready and wa_sent < WHATSAPP_DAILY_LIMIT and _true(row.get("whatsapp_opt_in")):
             prior = str(row.get("whatsapp_send_status") or "").strip().lower()
             numbers = _verified_whatsapp_numbers(row)
             if prior not in {"sent", "queued", "sending"} and numbers:
@@ -369,22 +383,44 @@ def main() -> int:
                     print(f"WHATSAPP_SKIPPED_INVALID_NUMBER website={website}")
                     continue
                 idem = hashlib.sha256(f"rozhan:{website}:whatsapp:{UTC_TODAY}".encode()).hexdigest()
+                row["whatsapp_send_status"] = "sending"
+                row["whatsapp_send_started_at_utc"] = now
                 try:
-                    row["whatsapp_send_status"] = "sending"
-                    row["whatsapp_send_started_at_utc"] = now
+                    # Persist the in-flight marker before calling the provider.
                     _save_row(row)
+                except Exception as exc:
+                    print(f"WHATSAPP_SKIPPED_STATUS_WRITE website={website} reason={type(exc).__name__}: {exc}")
+                    continue
+
+                try:
                     _send_whatsapp(wa_key, wa_account, recipient, _message_text(row), idem)
-                    row["whatsapp_send_status"] = "queued"
-                    row["whatsapp_sent_at_utc"] = now
-                    row["whatsapp_sent_to"] = recipient
-                    _save_row(row)
-                    wa_sent += 1
-                    print(f"WHATSAPP_QUEUED website={website}")
                 except Exception as exc:
                     row["whatsapp_send_status"] = "failed"
                     row["whatsapp_send_error"] = f"{type(exc).__name__}: {exc}"[:300]
-                    _save_row(row)
+                    try:
+                        _save_row(row)
+                    except Exception as save_exc:
+                        print(
+                            f"WHATSAPP_FAILED_STATUS_SAVE_FAILED website={website} "
+                            f"send_error={type(exc).__name__} save_error={type(save_exc).__name__}"
+                        )
                     print(f"WHATSAPP_FAILED website={website} reason={type(exc).__name__}")
+                else:
+                    # Keep the persisted 'sending' marker if the post-send write fails:
+                    # this prevents an automatic retry that could duplicate delivery.
+                    row["whatsapp_send_status"] = "queued"
+                    row["whatsapp_sent_at_utc"] = now
+                    row["whatsapp_sent_to"] = recipient
+                    try:
+                        _save_row(row)
+                    except Exception as exc:
+                        print(
+                            f"WHATSAPP_QUEUED_STATUS_SAVE_FAILED website={website} "
+                            f"recipient={recipient} reason={type(exc).__name__}: {exc}"
+                        )
+                    else:
+                        wa_sent += 1
+                        print(f"WHATSAPP_QUEUED website={website}")
 
     print(f"OUTREACH_COMPLETE email_daily_count={email_sent}/{EMAIL_DAILY_LIMIT} whatsapp_daily_count={wa_sent}/{WHATSAPP_DAILY_LIMIT}")
     return 0
