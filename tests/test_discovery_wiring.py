@@ -116,7 +116,10 @@ class TestHarvest:
                       parent=node)
         page = Page([_row("https://linkedin.com/in/a"), _row("https://linkedin.com/in/b")], 2)
 
-        with patch.object(discover_mod, "_fetch", return_value=page):
+        # Thompson sampling is intentionally stochastic; pin this test to the parent
+        # so it exercises the "first page contains every match" retirement path.
+        with patch.object(select, "next_node", return_value=node), \
+                patch.object(discover_mod, "_fetch", return_value=page):
             assert discover(c) is True
 
         node.refresh_from_db()
