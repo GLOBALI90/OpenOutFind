@@ -39,6 +39,7 @@ OSM_SEED_DOMAINS: set[str] = set()
 CHECKED_DOMAINS_FILE = Path('.cache/diesel_checked_domains_v2.txt')
 
 BUYER_SECTOR_TERMS = {
+    "fuel_importer_distributor": ("fuel importer", "diesel importer", "gasoil importer", "petroleum products importer", "oil marketing company", "fuel distributor", "petroleum distributor", "bulk fuel supplier", "importateur de gasoil", "importateur de carburants", "distributeur de carburants", "distribution de produits pétroliers", "société pétrolière", "مستورد الديزل", "مستورد السولار", "استيراد السولار", "توزيع الوقود", "موزع الوقود", "شركة تسويق المنتجات البترولية"),
     "mining": ("mining", "mine operator", "mineral processing", "矿业", "矿山", "minière", "تعدين", "mineração"),
     "transport_logistics": ("trucking", "haulage", "logistics fleet", "transport fleet", "物流", "运输车队", "flotte de camions", "أسطول النقل"),
     "shipping_ports": ("shipping", "marine fleet", "port operator", "vessel", "港口", "航运", "ميناء", "portuaire"),
@@ -370,7 +371,7 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--seeds", required=True)
-    parser.add_argument("--market", default="China", choices=("China", "Africa"))
+    parser.add_argument("--market", default="China", choices=("Egypt", "Morocco"))
     parser.add_argument("--max-pages", type=int, default=3)
     parser.add_argument("--max-domains", type=int, default=90)
     parser.add_argument("--max-seconds", type=int, default=2100)
