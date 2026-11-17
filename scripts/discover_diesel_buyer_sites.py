@@ -32,83 +32,56 @@ BLOCKED_HOSTS = {
     "ebay.com", "www.ebay.com", "etsy.com", "www.etsy.com",
 }
 
-CHINA_QUERIES = [
-    '"diesel fuel procurement" mining company China official website',
-    '"柴油采购" 矿山 采矿 企业 官网',
-    '"柴油" 露天矿 矿卡 车队 运营商',
-    '"柴油" 采石场 骨料 矿业 公司',
-    '"柴油" 水泥厂 熟料 工厂 采购',
-    '"柴油" 钢铁厂 焦化厂 冶金 工业集团',
-    '"柴油" 发电厂 备用发电机 电力运营商',
-    '"柴油发电机组" 租赁 服务 公司 中国',
-    '"柴油" 物流运输 重卡 车队 企业',
-    '"柴油" 港口 集装箱码头 运营商',
-    '"柴油" 船舶 船队 航运 公司',
-    '"柴油" 工程机械 土方施工 总承包商',
-    '"柴油" 油田 钻井 固井 压裂 服务商',
-    '"柴油" 农场 农业机械 大型农垦 企业',
-    '"柴油" 铁路 机车 维修 运营 公司',
-    '"柴油" 机场 地勤 特种车辆 运营商',
-    '"柴油" 环卫 垃圾运输 压缩车 运营公司',
-    '"柴油" 工业园区 自备电厂 制造企业',
-    '"柴油" 数据中心 备用发电机 运维 公司',
-    '"柴油" 通信基站 发电机 运维 服务商',
-    'China mine operator haul truck fleet fuel procurement company',
-    'China cement steel plant industrial diesel generator operations',
-    'China heavy haulage fleet logistics company diesel fuel',
-    'China port terminal marine shipping fleet operator diesel',
-    'China oilfield drilling contractor diesel equipment fleet',
+EGYPT_QUERIES = [
+    '"Egypt diesel gasoil importer procurement company official website"',
+    '"Egypt petroleum products importers diesel suppliers company"',
+    '"Egypt oil marketing companies gasoil diesel distribution procurement"',
+    '"Egypt licensed fuel importers diesel bulk supply companies"',
+    '"Egypt diesel fuel procurement industrial consumers mining cement logistics"',
+    '"Egypt gasoil import tenders EN590 procurement EGPC suppliers"',
+    '"مصر مستوردين السولار والديزل شركات استيراد وتوزيع الوقود"',
+    '"مصر شركات تسويق المنتجات البترولية استيراد السولار"',
+    '"مصر مناقصات توريد سولار ديزل شركات بترول"',
+    '"مصر موزعي الوقود بالجملة شركات توزيع المنتجات البترولية"',
+    '"Egypt fuel storage terminal diesel importer petroleum trading company"',
+    '"Egypt commercial fleet diesel procurement transport logistics company"',
+    '"Egypt cement mining industrial diesel generator fuel procurement"',
+    '"Egypt marine bunker gasoil suppliers port fuel distributors"',
+    '"Egypt petroleum products wholesale distributors gasoil company"',
+    '"Egypt diesel EN590 importers fuel distributors procurement"',
 ]
 
-AFRICA_QUERIES = [
-    'Africa mining operator haul truck fleet diesel fuel procurement official company',
-    'South Africa platinum gold coal mine contractor diesel fleet',
-    'Zambia DRC copper mine operator mining contractor fuel diesel',
-    'Ghana Burkina Faso gold mine operator heavy equipment fleet',
-    'Namibia Botswana Zimbabwe quarry mining haulage diesel',
-    'Nigeria Ghana Kenya Tanzania trucking haulage fleet diesel company',
-    'South Africa logistics transport heavy truck fleet fuel procurement',
-    'Africa cement clinker manufacturing plant diesel generator company',
-    'Africa steel manufacturing industrial plant backup diesel generator',
-    'Africa independent power producer diesel power plant generator operator',
-    'Africa industrial generator rental power solutions diesel company',
-    'Africa port terminal container handling equipment operator fleet',
-    'Africa shipping marine vessel fleet diesel fuel operator',
-    'Africa oilfield drilling services mining construction contractor fleet',
-    'Africa commercial agriculture plantation farm machinery diesel fleet',
-    'Africa railway locomotive freight operator diesel fleet company',
-    'Africa airport ground handling diesel vehicle fleet operator',
-    'Africa telecom tower power generator operations diesel service provider',
-    'Africa waste management municipal truck fleet diesel operator',
-    'Africa data centre backup generator diesel facilities operator',
-    'entreprise minière Afrique flotte camions diesel achat gasoil',
-    'société transport Afrique flotte poids lourds achat carburant diesel',
-    'cimenterie Afrique centrale électrique groupe électrogène diesel',
-    'opérateur portuaire Afrique flotte engins carburant gasoil',
-    'شركة تعدين في أفريقيا أسطول معدات ثقيلة وقود الديزل',
-    'شركة نقل في أفريقيا أسطول شاحنات شراء وقود الديزل',
-    'empresa mineração África frota caminhões diesel combustível',
-    'empresa logística África frota pesada compra gasóleo',
+MOROCCO_QUERIES = [
+    '"Morocco diesel gasoil importer procurement company official website"',
+    '"Morocco petroleum products importers gasoil suppliers company"',
+    '"Morocco licensed liquid petroleum product importers diesel"',
+    '"Morocco fuel distributors wholesale gasoil diesel companies"',
+    '"Morocco oil marketing companies diesel procurement distribution"',
+    '"Morocco gasoil import tenders EN590 fuel procurement"',
+    '"importateur gasoil Maroc société produits pétroliers"',
+    '"importation gasoil Maroc distributeur carburants professionnels"',
+    '"société de distribution carburants Maroc gasoil approvisionnement"',
+    '"grossiste carburant gasoil Maroc importateur produits pétroliers"',
+    '"Maroc autorisation importation produits pétroliers liquides gasoil"',
+    '"Maroc terminal stockage carburants importateur gasoil société"',
+    '"Maroc transport logistique flotte camions achat gasoil entreprise"',
+    '"Maroc cimenterie industrie achat gasoil diesel fournisseur"',
+    '"Maroc bunker marine gasoil port fournisseur carburant"',
+    '"Morocco EN590 diesel importers fuel distributors procurement"',
 ]
 
-
-# Curated discovery queries anchored to authoritative industry directories and registries.
-# These sources are used as public search indexes, not scraped behind interactive/login controls.
 SOURCE_QUERIES = {
-    "China": [
-        ("CCCME_industrial_directory", 'site:cccme.cn/suppliers China mining construction machinery power generation cement steel company'),
-        ("CCCME_industrial_directory", 'site:cccme.cn/suppliers China dump truck mine truck quarry aggregate heavy equipment fleet'),
-        ("FIATA_logistics_directory", 'site:fiata.org/directory China freight forwarder trucking logistics fleet company'),
-        ("industrial_company_discovery", 'China official company website diesel generator rental industrial power solutions'),
-        ("industrial_company_discovery", 'China port terminal operator mining contractor cement plant official company website'),
+    "Egypt": [
+        ("official_petroleum_sector", 'Egypt official petroleum companies fuel distribution diesel importer EGPC supplier'),
+        ("official_tender_discovery", 'Egypt diesel gasoil procurement tender EN590 petroleum products import'),
+        ("industrial_company_discovery", 'Egypt mining cement logistics industrial diesel fuel procurement company website'),
+        ("fuel_distribution_discovery", 'Egypt fuel marketing company petroleum products distribution gasoil official'),
     ],
-    "Africa": [
-        ("official_mining_registry", 'site:mmmd.gov.zm mining licence holder company Zambia mining operator'),
-        ("official_mining_registry", 'site:dmpr.gov.za mining permit company South Africa mine operator'),
-        ("official_mining_registry", 'Africa mining cadastre licence holder mine operator company website'),
-        ("FIATA_logistics_directory", 'site:fiata.org/directory Africa freight forwarder logistics member company website'),
-        ("industrial_company_discovery", 'Africa official company website diesel generator rental power solutions mining logistics'),
-        ("industrial_company_discovery", 'Africa cement plant port terminal trucking fleet operator company website'),
+    "Morocco": [
+        ("official_petroleum_sector", 'Morocco Ministry energy approved liquid petroleum product importers diesel gasoil'),
+        ("official_tender_discovery", 'Morocco diesel gasoil procurement tender EN590 petroleum products import'),
+        ("industrial_company_discovery", 'Morocco logistics cement mining industrial diesel fuel procurement company website'),
+        ("fuel_distribution_discovery", 'Morocco fuel marketing company petroleum products distributor gasoil official'),
     ],
 }
 
@@ -170,13 +143,13 @@ def search_rss(query: str) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--market", choices=("China", "Africa"), required=True)
+    parser.add_argument("--market", choices=("Egypt", "Morocco"), required=True)
     parser.add_argument("--output", default="discovered_seeds.txt")
     parser.add_argument("--limit", type=int, default=120)
     args = parser.parse_args()
 
     existing = read_existing_domains()
-    base_queries = CHINA_QUERIES if args.market == "China" else AFRICA_QUERIES
+    base_queries = EGYPT_QUERIES if args.market == "Egypt" else MOROCCO_QUERIES
     source_queries = SOURCE_QUERIES[args.market]
     query_items = [("general_public_web", q) for q in base_queries] + source_queries
     print(f"SOURCE_QUERY_GROUPS market={args.market} general={len(base_queries)} curated={len(source_queries)}")
