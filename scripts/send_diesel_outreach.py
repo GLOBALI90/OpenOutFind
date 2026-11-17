@@ -308,12 +308,16 @@ def main() -> int:
         f"whatsapp_blocked_no_optin={whatsapp_blocked_no_optin} "
         f"suppressed={sum(_suppressed(row) for row in rows)}"
     )
-    if args.dry_run:
-        print("DRY_RUN_ONLY no messages sent; preflight report above is the result.")
-        return 0
-
+    # Resolve the WhatsApp account even during dry-run so readiness can be
+    # verified without sending any messages.
     wa_key = os.environ.get("WUAPI_API_KEY", "").strip()
     wa_account = _resolve_whatsapp_account(wa_key) if args.whatsapp else ""
+    if args.dry_run:
+        if args.whatsapp:
+            state = "ready" if wa_account else "unavailable"
+            print(f"WHATSAPP_PREFLIGHT_ACCOUNT_{state.upper()} no_messages_sent=true")
+        print("DRY_RUN_ONLY no messages sent; preflight report above is the result.")
+        return 0
 
     now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     for row in rows:
