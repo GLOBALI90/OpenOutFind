@@ -93,8 +93,8 @@ def test_osm_discovery_uses_only_the_two_selected_countries():
     from scripts import discover_osm_industrial_sites as osm_discovery
 
     assert osm_discovery.REGIONS == {
-        "Egypt": ["africa/egypt"],
-        "Morocco": ["africa/morocco"],
+        "Egypt": ["egypt"],
+        "Morocco": ["morocco"],
     }
 
 
