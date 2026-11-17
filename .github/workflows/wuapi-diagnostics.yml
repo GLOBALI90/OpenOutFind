@@ -1,0 +1,21 @@
+name: Wuapi account diagnostics (read-only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Inspect Wuapi key scope and linked account statuses
+        env:
+          WUAPI_API_KEY: ${{ secrets.WUAPI_API_KEY }}
+          WUAPI_PROJECT: ${{ vars.WUAPI_PROJECT }}
+        run: python scripts/diagnose_wuapi.py
