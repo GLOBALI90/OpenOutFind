@@ -1,10 +1,6 @@
 name: Diesel buyer research and consented outreach
 
 on:
-  schedule:
-    - cron: "17 3 * * *"
-    - cron: "17 11 * * *"
-    - cron: "17 19 * * *"
   workflow_dispatch:
     inputs:
       market:
@@ -12,9 +8,9 @@ on:
         required: true
         type: choice
         options:
-          - China
-          - Africa
-        default: China
+          - Egypt
+          - Morocco
+        default: Egypt
       target_new_leads:
         description: "Maximum genuinely new company records for this run"
         required: true
@@ -56,7 +52,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: diesel-buyer-research
+  group: diesel-buyer-research-manual
   cancel-in-progress: false
 
 jobs:
@@ -75,27 +71,15 @@ jobs:
       - name: Resolve market and batch target
         shell: bash
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          SCHEDULE_EXPR: ${{ github.event.schedule }}
           INPUT_MARKET: ${{ inputs.market }}
           INPUT_TARGET: ${{ inputs.target_new_leads }}
         run: |
           set -euo pipefail
-          if [[ "$EVENT_NAME" == "schedule" ]]; then
-            case "$SCHEDULE_EXPR" in
-              "17 3 * * *"|"17 11 * * *") MARKET="China" ;;
-              "17 19 * * *") MARKET="Africa" ;;
-              *) echo "Unknown schedule slot: $SCHEDULE_EXPR"; exit 1 ;;
-            esac
-            TARGET_NEW="10"
-          else
-            MARKET="$INPUT_MARKET"
-            TARGET_NEW="${INPUT_TARGET:-10}"
-          fi
+          MARKET="${INPUT_MARKET:-Egypt}"
+          TARGET_NEW="${INPUT_TARGET:-10}"
           echo "MARKET=$MARKET" >> "$GITHUB_ENV"
           echo "TARGET_NEW=$TARGET_NEW" >> "$GITHUB_ENV"
-          echo "Batch market=$MARKET target_new=$TARGET_NEW"
-
+          echo "Manual batch market=$MARKET target_new=$TARGET_NEW"
       - name: Validate Google Sheets configuration
         env:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
@@ -164,7 +148,7 @@ jobs:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
         run: |
-          python diesel_leads/collector.py --seeds diesel_seeds.txt --market "$MARKET" --max-pages "${{ inputs.max_pages_per_company || '3' }}" --max-domains 90 --max-seconds 2100 --target-new "$TARGET_NEW" --output diesel_leads.jsonl
+          python diesel_leads/collector.py --seeds diesel_seeds.txt --market "$MARKET" --max-pages "${{ inputs.max_pages_per_company || '3' }}" --max-domains 60 --max-seconds 1500 --target-new "$TARGET_NEW" --output diesel_leads.jsonl
 
       - name: Merge new evidence into existing Leads rows
         env:
@@ -174,11 +158,11 @@ jobs:
           python -m pip install requests
           python scripts/export_diesel_buyers_to_sheets.py diesel_leads.jsonl
 
-      - name: Send approved outreach (scheduled and manual runs)
-        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (inputs.send_email || inputs.send_whatsapp))
+      - name: Send only when manually selected (dry-run by default)
+        if: github.event_name == 'workflow_dispatch' && (inputs.send_email || inputs.send_whatsapp)
         env:
-          SEND_EMAIL: ${{ github.event_name == 'schedule' || inputs.send_email }}
-          SEND_WHATSAPP: ${{ github.event_name == 'schedule' || inputs.send_whatsapp }}
+          SEND_EMAIL: ${{ inputs.send_email }}
+          SEND_WHATSAPP: ${{ inputs.send_whatsapp }}
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
           GMAIL_USERNAME: ${{ secrets.GMAIL_USERNAME }}
