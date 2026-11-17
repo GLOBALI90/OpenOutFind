@@ -16,8 +16,8 @@ from urllib.parse import urlparse
 
 INDEX_URL = "https://download.geofabrik.de/index-v1.json"
 REGIONS = {
-    "Egypt": ["egypt"],
-    "Morocco": ["morocco"],
+    "Egypt": ["africa/egypt"],
+    "Morocco": ["africa/morocco"],
 }
 USER_AGENT = "RozhanGlobalLeadResearch/1.0 (OSM extract processing)"
 
