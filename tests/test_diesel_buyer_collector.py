@@ -70,3 +70,29 @@ def test_outreach_rejects_old_sector_only_and_non_buyer_rows():
         "diesel_evidence_terms": '["diesel"]',
         "sector_evidence": '{"agriculture":["agriculture"]}',
     })
+
+
+def test_diesel_discovery_is_scoped_to_egypt_and_morocco():
+    from scripts import discover_diesel_buyer_sites as discovery
+
+    assert set(discovery.SOURCE_QUERIES) == {"Egypt", "Morocco"}
+    assert len(discovery.EGYPT_QUERIES) >= 10
+    assert len(discovery.MOROCCO_QUERIES) >= 10
+    assert any("مصر" in query for query in discovery.EGYPT_QUERIES)
+    assert any("Maroc" in query for query in discovery.MOROCCO_QUERIES)
+
+
+def test_fuel_importers_and_distributors_are_qualified_diesel_buyers():
+    assert _is_qualified_buyer(
+        ["diesel"],
+        {"fuel_importer_distributor": ["diesel importer", "fuel distributor"]},
+    )
+
+
+def test_osm_discovery_uses_only_the_two_selected_countries():
+    from scripts import discover_osm_industrial_sites as osm_discovery
+
+    assert osm_discovery.REGIONS == {
+        "Egypt": ["egypt"],
+        "Morocco": ["morocco"],
+    }
