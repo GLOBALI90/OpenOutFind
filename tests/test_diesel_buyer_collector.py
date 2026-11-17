@@ -96,3 +96,25 @@ def test_osm_discovery_uses_only_the_two_selected_countries():
         "Egypt": ["egypt"],
         "Morocco": ["morocco"],
     }
+
+
+def test_unavailable_wuapi_account_does_not_raise_and_can_leave_email_channel_available(monkeypatch, capsys):
+    from scripts import send_diesel_outreach as outreach
+
+    def unavailable(_api_key):
+        raise RuntimeError("Expected exactly one ready Wuapi account; found 0.")
+
+    monkeypatch.setattr(outreach, "_wuapi_account_id", unavailable)
+    assert outreach._resolve_whatsapp_account("test-key") == ""
+    output = capsys.readouterr().out
+    assert "WHATSAPP_CHANNEL_UNAVAILABLE" in output
+    assert "email_channel_will_continue" in output
+
+
+def test_missing_wuapi_key_does_not_abort_outreach(monkeypatch, capsys):
+    from scripts import send_diesel_outreach as outreach
+
+    assert outreach._resolve_whatsapp_account("") == ""
+    output = capsys.readouterr().out
+    assert "missing_api_key" in output
+    assert "email_channel_will_continue" in output
