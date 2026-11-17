@@ -266,17 +266,17 @@ def main() -> int:
     rows = _read_leads()
     email_sent = _daily_count(rows, "email")
     wa_sent = _daily_count(rows, "whatsapp")
-    email_eligible = sum(1 for row in rows if _true(row.get("email_outreach_eligible")) and not _suppressed(row))
+    email_eligible = sum(1 for row in rows if _qualified_buyer_row(row) and _true(row.get("email_outreach_eligible")) and not _suppressed(row))
     email_ready = sum(
         1 for row in rows
-        if _true(row.get("email_outreach_eligible")) and not _suppressed(row)
+        if _qualified_buyer_row(row) and _true(row.get("email_outreach_eligible")) and not _suppressed(row)
         and any(re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", value) for value in _values(row, "commercial_emails", "email"))
         and str(row.get("email_send_status") or "").strip().lower() not in {"sent", "queued", "sending"}
     )
-    whatsapp_opted_in = sum(1 for row in rows if _true(row.get("whatsapp_opt_in")) and not _suppressed(row))
+    whatsapp_opted_in = sum(1 for row in rows if _qualified_buyer_row(row) and _true(row.get("whatsapp_opt_in")) and not _suppressed(row))
     whatsapp_ready = sum(
         1 for row in rows
-        if _true(row.get("whatsapp_opt_in")) and not _suppressed(row)
+        if _qualified_buyer_row(row) and _true(row.get("whatsapp_opt_in")) and not _suppressed(row)
         and _verified_whatsapp_numbers(row)
         and str(row.get("whatsapp_send_status") or "").strip().lower() not in {"sent", "queued", "sending"}
     )
@@ -287,11 +287,11 @@ def main() -> int:
     phone_contact_rows = sum(bool(_values(row, "business_phones", "phone")) for row in rows)
     whatsapp_contact_rows = sum(bool(_verified_whatsapp_numbers(row)) for row in rows)
     email_blocked_no_approval = sum(
-        1 for row in rows if _values(row, "commercial_emails", "email")
+        1 for row in rows if _qualified_buyer_row(row) and _values(row, "commercial_emails", "email")
         and not _true(row.get("email_outreach_eligible")) and not _suppressed(row)
     )
     whatsapp_blocked_no_optin = sum(
-        1 for row in rows if _verified_whatsapp_numbers(row)
+        1 for row in rows if _qualified_buyer_row(row) and _verified_whatsapp_numbers(row)
         and not _true(row.get("whatsapp_opt_in")) and not _suppressed(row)
     )
     print(
@@ -325,7 +325,7 @@ def main() -> int:
         # Sheets upserts by "website"; older rows may only have discovered_url.
         row["website"] = website
 
-        if args.email and email_sent < EMAIL_DAILY_LIMIT and _true(row.get("email_outreach_eligible")):
+        if args.email and email_sent < EMAIL_DAILY_LIMIT and _qualified_buyer_row(row) and _true(row.get("email_outreach_eligible")):
             prior = str(row.get("email_send_status") or "").strip().lower()
             recipients = _values(row, "commercial_emails", "email")
             valid_recipients = [value for value in recipients if re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", value)]
@@ -372,7 +372,7 @@ def main() -> int:
             elif recipients and not valid_recipients:
                 print(f"EMAIL_SKIPPED_INVALID_ADDRESS website={website}")
 
-        if args.whatsapp and wa_account and wa_sent < WHATSAPP_DAILY_LIMIT and _true(row.get("whatsapp_opt_in")):
+        if args.whatsapp and wa_account and wa_sent < WHATSAPP_DAILY_LIMIT and _qualified_buyer_row(row) and _true(row.get("whatsapp_opt_in")):
             prior = str(row.get("whatsapp_send_status") or "").strip().lower()
             numbers = _verified_whatsapp_numbers(row)
             if prior not in {"sent", "queued", "sending"} and numbers:
