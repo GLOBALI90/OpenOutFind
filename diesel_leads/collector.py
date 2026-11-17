@@ -371,7 +371,7 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--seeds", required=True)
-    parser.add_argument("--market", default="China", choices=("Egypt", "Morocco"))
+    parser.add_argument("--market", default="Egypt", choices=("Egypt", "Morocco"))
     parser.add_argument("--max-pages", type=int, default=3)
     parser.add_argument("--max-domains", type=int, default=90)
     parser.add_argument("--max-seconds", type=int, default=2100)
