@@ -202,6 +202,20 @@ def _wuapi_account_id(api_key: str) -> str:
         raise RuntimeError(f"Expected exactly one ready Wuapi account; found {len(ready)}. No WhatsApp messages sent.")
     return str(ready[0]["id"])
 
+def _resolve_whatsapp_account(api_key: str) -> str:
+    """Resolve WhatsApp independently; an unavailable account must not block email."""
+    if not api_key:
+        print("WHATSAPP_CHANNEL_UNAVAILABLE reason=missing_api_key; email_channel_will_continue")
+        return ""
+    try:
+        return _wuapi_account_id(api_key)
+    except Exception as exc:
+        print(
+            "WHATSAPP_CHANNEL_UNAVAILABLE "
+            f"reason={type(exc).__name__}: {str(exc)[:240]}; email_channel_will_continue"
+        )
+        return ""
+
 
 def _send_whatsapp(api_key: str, account_id: str, recipient: str, body: str, idem_key: str) -> None:
     status, _ = _request_json(
@@ -299,9 +313,7 @@ def main() -> int:
         return 0
 
     wa_key = os.environ.get("WUAPI_API_KEY", "").strip()
-    wa_account = _wuapi_account_id(wa_key) if args.whatsapp and wa_key else ""
-    if args.whatsapp and not wa_key:
-        raise RuntimeError("WUAPI_API_KEY secret is missing; no WhatsApp messages sent.")
+    wa_account = _resolve_whatsapp_account(wa_key) if args.whatsapp else ""
 
     now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     for row in rows:
@@ -360,7 +372,7 @@ def main() -> int:
             elif recipients and not valid_recipients:
                 print(f"EMAIL_SKIPPED_INVALID_ADDRESS website={website}")
 
-        if args.whatsapp and wa_sent < WHATSAPP_DAILY_LIMIT and _true(row.get("whatsapp_opt_in")):
+        if args.whatsapp and wa_account and wa_sent < WHATSAPP_DAILY_LIMIT and _true(row.get("whatsapp_opt_in")):
             prior = str(row.get("whatsapp_send_status") or "").strip().lower()
             numbers = _verified_whatsapp_numbers(row)
             if prior not in {"sent", "queued", "sending"} and numbers:
@@ -386,6 +398,8 @@ def main() -> int:
                     _save_row(row)
                     print(f"WHATSAPP_FAILED website={website} reason={type(exc).__name__}")
 
+    if args.whatsapp and not wa_account:
+        print("WHATSAPP_SKIPPED account_unavailable; email_processing_completed_independently")
     print(f"OUTREACH_COMPLETE email_daily_count={email_sent}/{EMAIL_DAILY_LIMIT} whatsapp_daily_count={wa_sent}/{WHATSAPP_DAILY_LIMIT}")
     return 0
 
