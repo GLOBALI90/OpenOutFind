@@ -218,9 +218,11 @@ def _normalise_phone(raw: str) -> str:
 
 
 def _is_qualified_buyer(product_hits: list[str], sector_hits: dict[str, list[str]]) -> bool:
-    # Require explicit evidence of at least one named fuel plus a specific industrial,
-    # transport, power, mining, or fuel-trading sector phrase.
-    return bool(product_hits) and any(bool(values) for values in sector_hits.values())
+    # Generic directory/industry words alone are too weak to establish fuel consumption.
+    generic = {"agriculture", "shipping", "vessel", "mining", "mineração", "تعدين",
+               "portuaire", "industrial manufacturing", "工厂", "مصنع صناعي"}
+    specific = any(term.lower() not in generic for values in sector_hits.values() for term in values)
+    return bool(product_hits) and specific
 
 
 def _contact_data(text: str, links: list[str]) -> tuple[list[str], list[str], list[str], str, list[str]]:
@@ -324,7 +326,7 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
         for sector, terms in BUYER_SECTOR_TERMS.items()
     }
     qualified_sectors = {key: values for key, values in qualified_sectors.items() if values}
-    if not _is_qualified_buyer(product_hits, qualified_sectors)
+    if not _is_qualified_buyer(product_hits, qualified_sectors):
         print(
             f"REJECT_NOT_QUALIFIED_BUYER domain={host} pages_fetched={len(source_urls)} "
             f"fuel_product_hits={len(product_hits)} buyer_sector_hits={len(qualified_sectors)}"
