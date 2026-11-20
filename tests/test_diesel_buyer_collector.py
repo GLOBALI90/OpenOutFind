@@ -129,3 +129,14 @@ def test_multi_fuel_qualification_requires_product_and_specific_sector():
     assert _is_qualified_buyer(["natural gas"], {"mining": ["mine operator"]})
     assert not _is_qualified_buyer([], {"mining": ["mine operator"]})
     assert not _is_qualified_buyer(["lpg"], {})
+
+ 
+def test_sender_allows_only_diesel_category_from_multi_fuel_consumer_rows():
+    from scripts.send_diesel_outreach import _qualified_buyer_row
+
+    base = {
+        "buyer_type": "direct_fuel_consumer_evidence",
+        "sector_evidence": '{"mining":["mine operator"]}',
+    }
+    assert _qualified_buyer_row({**base, "diesel_evidence_terms": '["diesel"]'})
+    assert not _qualified_buyer_row({**base, "diesel_evidence_terms": "[]", "fuel_product_categories": '["lpg"]'})
