@@ -27,7 +27,7 @@ PHONE_RE = re.compile(r"(?<!\w)\+?\d(?:[\d\s().-]{5,22}\d)(?!\w)")
 DIESEL_TERMS = (
     "diesel", "gasoil", "gas oil", "diesel fuel", "diesel generator",
     "diesel-powered", "diesel powered", "diesel genset", "diesel fuel supply",
-    "fuel procurement", "fuel supply", "diesel consumption", "diesel fleet",
+    "diesel consumption", "diesel fleet",
     "柴油", "柴油燃料", "燃料采购", "柴油采购", "柴油发电机", "柴油机组",
     "carburant diesel", "achat de gasoil", "groupe électrogène diesel",
     "combustível diesel", "gasóleo", "gerador a diesel",
