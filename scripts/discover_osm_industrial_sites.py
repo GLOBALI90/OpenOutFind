@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 
 INDEX_URL = "https://download.geofabrik.de/index-v1.json"
 REGIONS = {
+    "Afghanistan": ["asia/afghanistan"],
     "Egypt": ["egypt"],
     "Morocco": ["morocco"],
 }
@@ -84,7 +85,7 @@ def extract_region(index: dict, region_id: str, out_dir: Path, handler) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--market", choices=("Egypt", "Morocco"), required=True)
+    parser.add_argument("--market", choices=("Afghanistan", "Egypt", "Morocco"), required=True)
     parser.add_argument("--output", default="osm_seeds.txt")
     parser.add_argument("--cache-file", required=True)
     parser.add_argument("--max-age-days", type=int, default=7)

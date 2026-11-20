@@ -72,10 +72,13 @@ def test_outreach_rejects_old_sector_only_and_non_buyer_rows():
     })
 
 
-def test_diesel_discovery_is_scoped_to_egypt_and_morocco():
+def test_discovery_includes_afghanistan_multi_fuel_market():
     from scripts import discover_diesel_buyer_sites as discovery
 
-    assert set(discovery.SOURCE_QUERIES) == {"Egypt", "Morocco"}
+    assert set(discovery.SOURCE_QUERIES) == {"Afghanistan", "Egypt", "Morocco"}
+    assert len(discovery.AFGHANISTAN_QUERIES) >= 12
+    assert any("افغانستان" in query for query in discovery.AFGHANISTAN_QUERIES)
+    assert any("natural gas" in query.lower() and "lpg" in query.lower() for query in discovery.AFGHANISTAN_QUERIES)
     assert len(discovery.EGYPT_QUERIES) >= 10
     assert len(discovery.MOROCCO_QUERIES) >= 10
     assert any("مصر" in query for query in discovery.EGYPT_QUERIES)
@@ -89,10 +92,11 @@ def test_fuel_importers_and_distributors_are_qualified_diesel_buyers():
     )
 
 
-def test_osm_discovery_uses_only_the_two_selected_countries():
+def test_osm_discovery_includes_afghanistan_region():
     from scripts import discover_osm_industrial_sites as osm_discovery
 
     assert osm_discovery.REGIONS == {
+        "Afghanistan": ["asia/afghanistan"],
         "Egypt": ["egypt"],
         "Morocco": ["morocco"],
     }
@@ -118,3 +122,21 @@ def test_missing_wuapi_key_does_not_abort_outreach(monkeypatch, capsys):
     output = capsys.readouterr().out
     assert "missing_api_key" in output
     assert "email_channel_will_continue" in output
+
+
+def test_multi_fuel_qualification_requires_product_and_specific_sector():
+    assert _is_qualified_buyer(["lpg"], {"cement_manufacturing": ["cement plant"]})
+    assert _is_qualified_buyer(["natural gas"], {"mining": ["mine operator"]})
+    assert not _is_qualified_buyer([], {"mining": ["mine operator"]})
+    assert not _is_qualified_buyer(["lpg"], {})
+
+ 
+def test_sender_allows_only_diesel_category_from_multi_fuel_consumer_rows():
+    from scripts.send_diesel_outreach import _qualified_buyer_row
+
+    base = {
+        "buyer_type": "direct_fuel_consumer_evidence",
+        "sector_evidence": '{"mining":["mine operator"]}',
+    }
+    assert _qualified_buyer_row({**base, "diesel_evidence_terms": '["diesel"]'})
+    assert not _qualified_buyer_row({**base, "diesel_evidence_terms": "[]", "fuel_product_categories": '["lpg"]'})

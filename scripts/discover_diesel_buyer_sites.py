@@ -70,7 +70,34 @@ MOROCCO_QUERIES = [
     '"Morocco EN590 diesel importers fuel distributors procurement"',
 ]
 
+AFGHANISTAN_QUERIES = [
+    '"Afghanistan industrial natural gas LPG CNG LNG diesel fuel consumers companies"',
+    '"Afghanistan cement factories fuel gas diesel procurement official website"',
+    '"Afghanistan mining companies fuel consumption diesel generators operations"',
+    '"Afghanistan manufacturing factories LPG natural gas fuel procurement"',
+    '"Afghanistan power plants fuel oil diesel natural gas operators"',
+    '"Afghanistan food processing textile factories LPG diesel boilers"',
+    '"Afghanistan fuel importers petroleum products LPG diesel gasoline companies"',
+    '"Afghanistan petroleum products importers distributors official company"',
+    '"Afghanistan industrial fuel procurement natural gas LPG propane butane"',
+    '"Afghanistan heavy transport logistics fleet diesel fuel consumers"',
+    '"افغانستان شرکت های صنعتی مصرف کننده گاز طبیعی گاز مایع دیزل سوخت"',
+    '"افغانستان کارخانه سیمان معدن کارخانه تولیدی مصرف گازوئیل گاز مایع"',
+    '"افغانستان واردکنندگان و توزیع کنندگان گاز مایع نفت و مواد نفتی"',
+    '"افغانستان شرکت های تولید برق مصرف کننده دیزل نفت کوره گاز"',
+    '"افغانستان شرکت های حمل و نقل ماشین آلات سنگین مصرف کننده گازوئیل"',
+    '"افغانستان د طبیعي ګازو مایع ګاز ډیزل مصرفوونکي فابریکې شرکتونه"',
+    '"افغانستان د تېلو او نفتو محصولاتو واردوونکي او وېشونکي شرکتونه"',
+]
+AFGHANISTAN_SOURCE_QUERIES = [
+    ("industrial_consumers", "Afghanistan cement mining manufacturing food processing industrial energy fuel consumers"),
+    ("fuel_importers", "Afghanistan petroleum products LPG diesel gasoline importers distributors official companies"),
+    ("gas_consumers", "Afghanistan natural gas LPG CNG LNG industrial consumers companies"),
+    ("power_transport", "Afghanistan power generation heavy transport logistics diesel fuel procurement"),
+]
+
 SOURCE_QUERIES = {
+    "Afghanistan": AFGHANISTAN_SOURCE_QUERIES,
     "Egypt": [
         ("official_petroleum_sector", 'Egypt official petroleum companies fuel distribution diesel importer EGPC supplier'),
         ("official_tender_discovery", 'Egypt diesel gasoil procurement tender EN590 petroleum products import'),
@@ -143,13 +170,13 @@ def search_rss(query: str) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--market", choices=("Egypt", "Morocco"), required=True)
+    parser.add_argument("--market", choices=("Afghanistan", "Egypt", "Morocco"), required=True)
     parser.add_argument("--output", default="discovered_seeds.txt")
     parser.add_argument("--limit", type=int, default=120)
     args = parser.parse_args()
 
     existing = read_existing_domains()
-    base_queries = EGYPT_QUERIES if args.market == "Egypt" else MOROCCO_QUERIES
+    base_queries = {"Afghanistan": AFGHANISTAN_QUERIES, "Egypt": EGYPT_QUERIES, "Morocco": MOROCCO_QUERIES}[args.market]
     source_queries = SOURCE_QUERIES[args.market]
     query_items = [("general_public_web", q) for q in base_queries] + source_queries
     print(f"SOURCE_QUERY_GROUPS market={args.market} general={len(base_queries)} curated={len(source_queries)}")

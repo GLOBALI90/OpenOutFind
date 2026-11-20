@@ -27,12 +27,23 @@ PHONE_RE = re.compile(r"(?<!\w)\+?\d(?:[\d\s().-]{5,22}\d)(?!\w)")
 DIESEL_TERMS = (
     "diesel", "gasoil", "gas oil", "diesel fuel", "diesel generator",
     "diesel-powered", "diesel powered", "diesel genset", "diesel fuel supply",
-    "fuel procurement", "fuel supply", "diesel consumption", "diesel fleet",
+    "diesel consumption", "diesel fleet",
     "柴油", "柴油燃料", "燃料采购", "柴油采购", "柴油发电机", "柴油机组",
     "carburant diesel", "achat de gasoil", "groupe électrogène diesel",
     "combustível diesel", "gasóleo", "gerador a diesel",
     "وقود الديزل", "شراء الديزل", "مولدات الديزل", "زيت الغاز",
 )
+FUEL_PRODUCT_TERMS = {
+    "natural_gas": ("natural gas", "pipeline gas", "methane", "گاز طبیعی", "ګاز طبیعي"),
+    "lpg": ("lpg", "liquefied petroleum gas", "propane", "butane", "گاز مایع", "گاز مایع نفتی", "پروپان", "بوتان"),
+    "cng": ("cng", "compressed natural gas", "گاز فشرده", "ګاز فشرده"),
+    "lng": ("lng", "liquefied natural gas", "گاز طبیعی مایع"),
+    "diesel_gasoil": DIESEL_TERMS,
+    "gasoline": ("gasoline", "petrol", "motor spirit", "بنزین", "پټرول"),
+    "fuel_oil_mazut": ("fuel oil", "heavy fuel oil", "hfo", "mazut", "مازوت", "نفت کوره"),
+    "kerosene_jet": ("kerosene", "jet fuel", "aviation fuel", "نفت سفید", "سوخت جت"),
+    "other_petroleum": ("naphtha", "bitumen", "asphalt", "petroleum coke", "نفتا", "قیر", "کک نفتی"),
+}
 EXISTING_COMPANY_DOMAINS: set[str] = set()
 SUCCESSFULLY_FETCHED_DOMAINS: set[str] = set()
 OSM_SEED_DOMAINS: set[str] = set()
@@ -46,6 +57,8 @@ BUYER_SECTOR_TERMS = {
     "construction": ("construction equipment", "earthmoving", "heavy equipment", "工程机械", "重型设备", "équipement lourd"),
     "power_generation": ("power plant", "backup generator", "power generation", "发电厂", "发电", "محطة توليد الكهرباء", "centrale électrique"),
     "cement_manufacturing": ("cement plant", "cement manufacturing", "industrial manufacturing", "水泥厂", "水泥制造", "cimenterie"),
+    "food_processing": ("food processing plant", "food manufacturing", "food factory", "食品加工", "مصنع مواد غذائية"),
+    "textile_manufacturing": ("textile mill", "textile factory", "textile manufacturing", "نساجی", "کارخانه نساجی"),
     "agriculture": ("agricultural machinery", "farm equipment", "commercial farming", "irrigation pump", "tractor fleet", "农业机械", "machinerie agricole", "زراعة"),
     "oilfield_services": ("oilfield services", "drilling contractor", "well services", "油田", "خدمات حقول النفط", "services pétroliers"),
     "generator_rental": ("generator rental", "genset rental", "power rental", "柴油发电机组租赁", "تأجير مولدات"),
@@ -206,9 +219,12 @@ def _normalise_phone(raw: str) -> str:
     return ("+" + digits) if value.startswith("+") else digits
 
 
-def _is_qualified_buyer(diesel_hits: list[str], sector_hits: dict[str, list[str]]) -> bool:
-    # Require explicit diesel/gasoil evidence and a specific high-consumption sector phrase.
-    return bool(diesel_hits) and any(any(term in BUYER_SECTOR_TERMS.get(key, ()) for term in values) for key, values in sector_hits.items())
+def _is_qualified_buyer(product_hits: list[str], sector_hits: dict[str, list[str]]) -> bool:
+    # Generic directory/industry words alone are too weak to establish fuel consumption.
+    generic = {"agriculture", "shipping", "vessel", "mining", "mineração", "تعدين",
+               "portuaire", "industrial manufacturing", "工厂", "مصنع صناعي"}
+    specific = any(term.lower() not in generic for values in sector_hits.values() for term in values)
+    return bool(product_hits) and specific
 
 
 def _contact_data(text: str, links: list[str]) -> tuple[list[str], list[str], list[str], str, list[str]]:
@@ -300,22 +316,28 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
         time.sleep(0.25)
 
     combined = " ".join(all_text).lower()
-    diesel_hits = sorted({term for term in DIESEL_TERMS if term in combined})
+    product_evidence = {
+        category: sorted({term for term in terms if term in combined})
+        for category, terms in FUEL_PRODUCT_TERMS.items()
+    }
+    product_evidence = {key: values for key, values in product_evidence.items() if values}
+    product_hits = sorted({term for values in product_evidence.values() for term in values})
+    product_categories = sorted(product_evidence)
     qualified_sectors = {
         sector: [term for term in terms if term in combined]
         for sector, terms in BUYER_SECTOR_TERMS.items()
     }
     qualified_sectors = {key: values for key, values in qualified_sectors.items() if values}
-    if not _is_qualified_buyer(diesel_hits, qualified_sectors):
+    if not _is_qualified_buyer(product_hits, qualified_sectors):
         print(
             f"REJECT_NOT_QUALIFIED_BUYER domain={host} pages_fetched={len(source_urls)} "
-            f"diesel_hits={len(diesel_hits)} buyer_sector_hits={len(qualified_sectors)}"
+            f"fuel_product_hits={len(product_hits)} buyer_sector_hits={len(qualified_sectors)}"
         )
         return None
     sector_hits = qualified_sectors
 
     emails, phones, whatsapp, wa_status, wa_evidence = _contact_data(" ".join(all_text), all_links)
-    direct = bool(diesel_hits)
+    direct = bool(product_hits)
     score = min(100, (65 if direct else 0) + min(25, 8 * len(sector_hits)) + (5 if emails else 0) + (5 if phones else 0))
     domain = host.removeprefix("www.")
     key = hashlib.sha256(domain.encode("utf-8")).hexdigest()[:24]
@@ -337,20 +359,22 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
             if domain in OSM_SEED_DOMAINS
             else "public_company_website"
         ),
-        "lead_segment": "Diesel / Gasoil buyer research",
-        "product_interest": "Diesel / Gasoil",
+        "lead_segment": "Afghanistan multi-fuel buyer research",
+        "product_interest": ", ".join(product_categories),
+        "fuel_product_categories": product_categories,
+        "fuel_product_evidence_terms": product_evidence,
         "lead_source": "public_company_website_research",
         "industry": ", ".join(sorted(sector_hits)),
         "email": "; ".join(emails),
         "phone": "; ".join(phones),
         "whatsapp": "; ".join(whatsapp),
-        "evidence": "Diesel terms: " + ", ".join(diesel_hits) + "; sectors: " + ", ".join(sorted(sector_hits)),
+        "evidence": "Fuel products: " + ", ".join(product_hits) + "; sectors: " + ", ".join(sorted(sector_hits)),
         "lead_score": score,
         "collected_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "country": "",
+        "country": market,
         "city": "",
-        "buyer_type": "direct_diesel_evidence",
-        "diesel_evidence_terms": diesel_hits,
+        "buyer_type": ("fuel_importer_distributor_evidence" if "fuel_importer_distributor" in sector_hits else "direct_fuel_consumer_evidence"),
+        "diesel_evidence_terms": product_evidence.get("diesel_gasoil", []),
         "sector_evidence": sector_hits,
         "commercial_emails": emails,
         "business_phones": phones,
@@ -363,7 +387,7 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
         "contact_validation": "format_only_not_mailbox_verified" if emails else "not_found",
         "qualification_score": score,
         "source_urls": sorted(set(source_urls)),
-        "evidence_note": "Direct diesel/gasoil evidence and a specific high-consumption buyer-sector phrase were both found on the company website.",
+        "evidence_note": "At least one named fuel product and a specific consumer/importer sector phrase were both found on the company website; buyer type still requires manual confirmation.",
         "collected_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
 
@@ -371,7 +395,7 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--seeds", required=True)
-    parser.add_argument("--market", default="Egypt", choices=("Egypt", "Morocco"))
+    parser.add_argument("--market", default="Afghanistan", choices=("Afghanistan", "Egypt", "Morocco"))
     parser.add_argument("--max-pages", type=int, default=3)
     parser.add_argument("--max-domains", type=int, default=90)
     parser.add_argument("--max-seconds", type=int, default=2100)
