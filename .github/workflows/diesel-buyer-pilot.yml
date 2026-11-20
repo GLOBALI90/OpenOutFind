@@ -42,10 +42,10 @@ on:
         type: boolean
         default: true
       dry_run:
-        description: "Safety mode: report eligible contacts only; no messages are sent"
+        description: "Safety mode: true = no sends; false = send only contacts with explicit channel eligibility/opt-in"
         required: true
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: read
