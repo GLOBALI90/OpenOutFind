@@ -12,9 +12,9 @@ import requests
 
 LIST_FIELDS = {
     "commercial_emails", "business_phones", "whatsapp_numbers", "whatsapp_evidence",
-    "diesel_evidence_terms", "source_urls",
+    "diesel_evidence_terms", "fuel_product_categories", "fuel_product_evidence_terms", "source_urls",
 }
-DICT_FIELDS = {"sector_evidence"}
+DICT_FIELDS = {"sector_evidence", "fuel_product_evidence_terms"}
 
 
 def _domain_key(value: object) -> str:
@@ -167,12 +167,11 @@ def main() -> int:
         merged["last_seen_at_utc"] = collected_at
         merged["record_status"] = "existing_company_refresh" if previous else "new_company_candidate"
 
-        # The account owner confirmed that the existing and newly collected target contacts
-        # are authorized for both outreach channels. Suppression flags still take precedence.
-        # Existing explicit values are preserved; new rows inherit the confirmed authorization.
-        merged.setdefault("outreach_consent_status", "user_confirmed_authorized")
-        merged.setdefault("email_outreach_eligible", "TRUE")
-        merged.setdefault("whatsapp_opt_in", "TRUE")
+        # Publicly listed business contacts are research data, not proof of outreach consent.
+        # Preserve existing explicit consent fields; never create opt-in from scraped data.
+        merged.setdefault("outreach_consent_status", "not_recorded")
+        merged.setdefault("email_outreach_eligible", "FALSE")
+        merged.setdefault("whatsapp_opt_in", "FALSE")
         merged.setdefault("do_not_contact", "FALSE")
         merged.setdefault("unsubscribed", "FALSE")
         merged.setdefault("email_send_status", "not_sent")
@@ -181,8 +180,8 @@ def main() -> int:
         # Keep the legacy Leads columns populated for compatibility with existing views.
         merged["email"] = _merge_text(previous.get("email"), list(record.get("commercial_emails") or []))
         merged["phone"] = _merge_text(previous.get("phone"), list(record.get("business_phones") or []))
-        merged["product_interest"] = "Diesel / Gasoil"
-        merged["lead_segment"] = "Diesel / Gasoil buyer research"
+        merged["product_interest"] = _merge_text(previous.get("product_interest"), [str(record.get("product_interest") or "")])
+        merged["lead_segment"] = str(record.get("lead_segment") or "Afghanistan multi-fuel buyer research")
         merged_records.append(merged)
 
     headers = list(dict.fromkeys(key for row in merged_records for key in row))
