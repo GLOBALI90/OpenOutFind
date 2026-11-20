@@ -122,7 +122,9 @@ def _suppressed(row: dict) -> bool:
 
 
 def _qualified_buyer_row(row: dict) -> bool:
-    if str(row.get("buyer_type") or "").strip().lower() != "direct_diesel_evidence":
+    if str(row.get("buyer_type") or "").strip().lower() not in {
+        "direct_diesel_evidence", "direct_fuel_consumer_evidence"
+    }:
         return False
     if not _values(row, "diesel_evidence_terms"):
         return False
