@@ -94,7 +94,7 @@ jobs:
             echo "Missing Google Sheets bridge secrets."
             exit 1
           fi
-          printf '%s\n' "${MANUAL_SEEDS:-}" > manual_seeds.txt
+          printf '%s\\n' "${MANUAL_SEEDS:-}" > manual_seeds.txt
           : > diesel_seeds.txt
 
       - name: Restore cached OpenStreetMap company website seeds
@@ -139,7 +139,7 @@ jobs:
                   seen_urls.add(key)
                   seen_domains.add(domain)
                   ordered.append(url)
-          Path("diesel_seeds.txt").write_text("\n".join(ordered) + ("\n" if ordered else ""), encoding="utf-8")
+          Path("diesel_seeds.txt").write_text("\\n".join(ordered) + ("\\n" if ordered else ""), encoding="utf-8")
           print(f"SEED_PRIORITY_ORDER manual_search_osm unique_domains={len(ordered)}")
           PY
           echo "DISCOVERED_SEED_URLS=$(grep -c '^https?://' diesel_seeds.txt || true)"
@@ -159,18 +159,18 @@ jobs:
           python -m pip install requests
           python scripts/export_diesel_buyers_to_sheets.py diesel_leads.jsonl
 
-      # Scheduled runs are collection-only. Sending is available only in a manual dispatch.
-      - name: Send only when manually selected
-        if: github.event_name == 'workflow_dispatch' && (inputs.send_email || inputs.send_whatsapp)
+      # Scheduled runs send only to contacts already explicitly eligible/opted-in.
+      - name: Send consent-eligible outreach (scheduled and manually selected)
+        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (inputs.send_email || inputs.send_whatsapp))
         env:
-          SEND_EMAIL: ${{ inputs.send_email }}
-          SEND_WHATSAPP: ${{ inputs.send_whatsapp }}
+          SEND_EMAIL: ${{ github.event_name == 'schedule' && 'true' || inputs.send_email }}
+          SEND_WHATSAPP: ${{ github.event_name == 'schedule' && 'true' || inputs.send_whatsapp }}
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
           GMAIL_USERNAME: ${{ secrets.GMAIL_USERNAME }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           WUAPI_API_KEY: ${{ secrets.WUAPI_API_KEY }}
-          DRY_RUN: ${{ inputs.dry_run }}
+          DRY_RUN: ${{ github.event_name == 'schedule' && 'false' || inputs.dry_run }}
         run: |
           set -euo pipefail
           ARGS=()
