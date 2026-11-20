@@ -1,6 +1,8 @@
 name: Afghanistan multi-fuel buyer research and consent-gated outreach
 
 on:
+  schedule:
+    - cron: "0 */3 * * *"
   workflow_dispatch:
     inputs:
       market:
@@ -78,7 +80,8 @@ jobs:
           TARGET_NEW="${INPUT_TARGET:-10}"
           echo "MARKET=$MARKET" >> "$GITHUB_ENV"
           echo "TARGET_NEW=$TARGET_NEW" >> "$GITHUB_ENV"
-          echo "Manual batch market=$MARKET target_new=$TARGET_NEW"
+          echo "Batch market=$MARKET target_new=$TARGET_NEW"
+
       - name: Validate Google Sheets configuration
         env:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
@@ -91,7 +94,7 @@ jobs:
             echo "Missing Google Sheets bridge secrets."
             exit 1
           fi
-          printf '%s\n' "${MANUAL_SEEDS:-}" > manual_seeds.txt
+          printf '%s\\n' "${MANUAL_SEEDS:-}" > manual_seeds.txt
           : > diesel_seeds.txt
 
       - name: Restore cached OpenStreetMap company website seeds
@@ -136,10 +139,10 @@ jobs:
                   seen_urls.add(key)
                   seen_domains.add(domain)
                   ordered.append(url)
-          Path("diesel_seeds.txt").write_text("\n".join(ordered) + ("\n" if ordered else ""), encoding="utf-8")
+          Path("diesel_seeds.txt").write_text("\\n".join(ordered) + ("\\n" if ordered else ""), encoding="utf-8")
           print(f"SEED_PRIORITY_ORDER manual_search_osm unique_domains={len(ordered)}")
           PY
-          echo "DISCOVERED_SEED_URLS=$(grep -c '^https\?://' diesel_seeds.txt || true)"
+          echo "DISCOVERED_SEED_URLS=$(grep -c '^https?://' diesel_seeds.txt || true)"
 
       - name: Read existing Leads and collect genuinely new companies
         env:
@@ -156,7 +159,8 @@ jobs:
           python -m pip install requests
           python scripts/export_diesel_buyers_to_sheets.py diesel_leads.jsonl
 
-      - name: Send only when manually selected (dry-run by default)
+      # Scheduled runs are collection-only. Sending is available only in a manual dispatch.
+      - name: Send only when manually selected
         if: github.event_name == 'workflow_dispatch' && (inputs.send_email || inputs.send_whatsapp)
         env:
           SEND_EMAIL: ${{ inputs.send_email }}
