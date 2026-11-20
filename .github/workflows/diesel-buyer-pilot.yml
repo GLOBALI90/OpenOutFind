@@ -94,7 +94,7 @@ jobs:
             echo "Missing Google Sheets bridge secrets."
             exit 1
           fi
-          printf '%s\\n' "${MANUAL_SEEDS:-}" > manual_seeds.txt
+          printf '%s\n' "${MANUAL_SEEDS:-}" > manual_seeds.txt
           : > diesel_seeds.txt
 
       - name: Restore cached OpenStreetMap company website seeds
@@ -139,7 +139,7 @@ jobs:
                   seen_urls.add(key)
                   seen_domains.add(domain)
                   ordered.append(url)
-          Path("diesel_seeds.txt").write_text("\\n".join(ordered) + ("\\n" if ordered else ""), encoding="utf-8")
+          Path("diesel_seeds.txt").write_text("\n".join(ordered) + ("\n" if ordered else ""), encoding="utf-8")
           print(f"SEED_PRIORITY_ORDER manual_search_osm unique_domains={len(ordered)}")
           PY
           echo "DISCOVERED_SEED_URLS=$(grep -c '^https?://' diesel_seeds.txt || true)"
