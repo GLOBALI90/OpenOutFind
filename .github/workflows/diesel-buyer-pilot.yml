@@ -1,20 +1,32 @@
-name: Diesel buyer research (collection-only pilot)
+name: Rojan Global — multi-product buyer research (collection only)
 
 on:
   workflow_dispatch:
     inputs:
       market:
-        description: "Market priority for this batch"
+        description: "Market priority"
         required: true
         type: choice
         options:
-          - China
+          - Worldwide
           - Africa
-        default: China
+          - Asia
+          - Middle East
+          - China
+        default: Africa
       seed_urls:
-        description: "Public company or industry-directory URLs, one per line"
+        description: "Public procurement/company sources, one URL per line (editable)"
         required: true
         type: string
+        default: |-
+          https://dangoteeastafrica.co.ke/
+          https://www.pbpa.go.tz/
+          https://www.totalenergies.ug/projects/tilenga/national-content/tenders
+          https://www.etenders.gov.za/
+          https://www.erwat.co.za/
+          https://www.johannesburgwater.co.za/
+          https://www.sibanyestillwater.com/suppliers/south-africa/procurement-contacts/
+          https://www.yokogawa.com/mea/industries/oil-gas/
       max_pages_per_company:
         description: "Maximum same-site pages to inspect per URL"
         required: true
@@ -63,7 +75,7 @@ jobs:
             exit 1
           fi
 
-      - name: Read existing Leads and collect public company evidence
+      - name: Read existing Leads and collect multi-product buyer evidence
         env:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
