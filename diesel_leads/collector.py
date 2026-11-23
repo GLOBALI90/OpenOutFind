@@ -23,10 +23,17 @@ from pathlib import Path
 USER_AGENT = "RozhanDieselBuyerResearch/0.1 (+public-company-research; contact: admin@example.invalid)"
 EMAIL_RE = re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
 PHONE_RE = re.compile(r"(?<!\w)(?:\+?\d[\d\s().-]{7,}\d)(?!\w)")
-DIESEL_TERMS = (
-    "diesel", "gasoil", "gas oil", "diesel fuel", "diesel generator",
-    "diesel-powered", "diesel powered", "fuel procurement",
-)
+PRODUCT_TERMS = {
+    "oil_gas_fuels": ("diesel", "gasoil", "gas oil", "diesel fuel", "fuel procurement", "jet fuel", "lpg", "lng", "fuel oil", "base oil", "bitumen", "naphtha", "crude oil"),
+    "petrochemicals": ("methanol", "urea", "ammonia", "polyethylene", "polypropylene", "pvc resin", "ethylene", "propylene", "petrochemical"),
+    "industrial_chemicals": ("sulfuric acid", "caustic soda", "sodium hydroxide", "soda ash", "hydrochloric acid", "industrial chemicals", "solvents", "chemical reagents"),
+    "energy": ("solar energy", "solar panels", "power generation", "energy storage", "power plant", "renewable energy"),
+    "automation_instrumentation": ("plc", "dcs", "scada", "instrumentation", "pressure transmitter", "flow meter", "control valve", "actuator", "industrial sensor", "automation"),
+    "metals_minerals": ("sulphur", "sulfur", "iron ore", "copper cathode", "steel", "bauxite", "zinc", "lead", "coal"),
+    "industrial_materials": ("cement", "construction materials", "industrial materials"),
+}
+BUYING_SIGNALS = ("request for quotation", "rfq", "request for proposal", "rfi", "tender", "procurement", "purchase order", "supplier registration", "bid submission", "buying", "sourcing", "quotation", "supply requirement")
+DIESEL_TERMS = PRODUCT_TERMS["oil_gas_fuels"]
 EXISTING_COMPANY_DOMAINS: set[str] = set()
 
 SECTOR_TERMS = {
@@ -228,18 +235,23 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
         time.sleep(1.0)
 
     combined = " ".join(all_text).lower()
+    product_hits = {category: sorted({term for term in terms if term in combined})
+                    for category, terms in PRODUCT_TERMS.items()}
+    product_hits = {k: v for k, v in product_hits.items() if v}
     diesel_hits = sorted({term for term in DIESEL_TERMS if term in combined})
+    buying_hits = sorted({term for term in BUYING_SIGNALS if term in combined})
     sector_hits = {
         sector: sorted({term for term in terms if term in combined})
         for sector, terms in SECTOR_TERMS.items()
     }
     sector_hits = {k: v for k, v in sector_hits.items() if v}
-    if not diesel_hits and not sector_hits:
+    if not product_hits and not sector_hits:
         return None
 
     emails, phones, whatsapp, wa_status = _contact_data(" ".join(all_text), all_links)
     direct = bool(diesel_hits)
-    score = min(100, (65 if direct else 0) + min(25, 8 * len(sector_hits)) + (5 if emails else 0) + (5 if phones else 0))
+    signal = bool(buying_hits)
+    score = min(100, (40 if direct else 20 if product_hits else 0) + min(20, 5 * len(product_hits)) + (15 if signal else 0) + min(10, 5 * len(sector_hits)) + (5 if emails else 0) + (5 if phones else 0))
     domain = host.removeprefix("www.")
     key = hashlib.sha256(domain.encode("utf-8")).hexdigest()[:24]
     return {
@@ -252,19 +264,21 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
         "target_market": market,
         "source": f"Public company website: {parsed_seed.scheme}://{parsed_seed.netloc}",
         "source_provider": "public_company_website",
-        "lead_segment": "Diesel / Gasoil buyer research",
-        "product_interest": "Diesel / Gasoil",
+        "lead_segment": "Rojan Global industrial buyer research",
+        "product_interest": "; ".join(sorted(product_hits)),
         "lead_source": "public_company_website_research",
         "industry": ", ".join(sorted(sector_hits)),
         "email": "; ".join(emails),
         "phone": "; ".join(phones),
         "whatsapp": "; ".join(whatsapp),
-        "evidence": "Diesel terms: " + ", ".join(diesel_hits) + "; sectors: " + ", ".join(sorted(sector_hits)),
+        "evidence": "Products: " + ", ".join(sorted(product_hits)) + "; buying signals: " + ", ".join(buying_hits) + "; sectors: " + ", ".join(sorted(sector_hits)),
         "lead_score": score,
         "collected_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "country": "",
         "city": "",
-        "buyer_type": "direct_diesel_evidence" if direct else "sector_candidate_needs_confirmation",
+        "buyer_type": "public_buying_signal" if signal else "product_or_sector_candidate_needs_confirmation",
+        "product_evidence": product_hits,
+        "buying_signal_terms": buying_hits,
         "diesel_evidence_terms": diesel_hits,
         "sector_evidence": sector_hits,
         "commercial_emails": emails,
@@ -274,7 +288,7 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
         "contact_validation": "format_only_not_mailbox_verified" if emails else "not_found",
         "qualification_score": score,
         "source_urls": sorted(set(source_urls)),
-        "evidence_note": "Direct diesel-related text found on public company pages." if direct else "Relevant fuel-consuming sector found; diesel consumption is not confirmed.",
+        "evidence_note": "Public buying/procurement wording found on the website." if signal else "Product or sector relevance found; an active purchase is not confirmed.",
         "collected_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
 
@@ -282,7 +296,7 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--seeds", required=True, help="Text file containing one public company/directory URL per line")
-    parser.add_argument("--market", default="China", choices=("China", "Africa"))
+    parser.add_argument("--market", default="China", choices=("Worldwide", "Africa", "Asia", "Middle East", "China"))
     parser.add_argument("--max-pages", type=int, default=5)
     parser.add_argument("--output", default="diesel_leads.jsonl")
     args = parser.parse_args()
