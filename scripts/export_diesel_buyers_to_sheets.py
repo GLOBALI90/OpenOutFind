@@ -170,8 +170,8 @@ def main() -> int:
         # Keep the legacy Leads columns populated for compatibility with existing views.
         merged["email"] = _merge_text(previous.get("email"), list(record.get("commercial_emails") or []))
         merged["phone"] = _merge_text(previous.get("phone"), list(record.get("business_phones") or []))
-        merged["product_interest"] = "Diesel / Gasoil"
-        merged["lead_segment"] = "Diesel / Gasoil buyer research"
+        merged["product_interest"] = _merge_text(previous.get("product_interest"), [str(record.get("product_interest") or "")])
+        merged["lead_segment"] = str(record.get("lead_segment") or previous.get("lead_segment") or "Rojan Global industrial buyer research")
         merged_records.append(merged)
 
     headers = list(dict.fromkeys(key for row in merged_records for key in row))
