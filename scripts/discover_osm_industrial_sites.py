@@ -130,18 +130,38 @@ def main() -> int:
     handler = WebsiteHandler()
     work = Path(".cache/osm_pbf")
     work.mkdir(parents=True, exist_ok=True)
+    # OSM is an optional enrichment source: never block web-based lead discovery
+    # when Geofabrik is temporarily unavailable. Log the full exception for diagnosis.
     request = urllib.request.Request(INDEX_URL, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(request, timeout=60) as response:
-        index = json.loads(response.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            index = json.loads(response.read().decode("utf-8"))
+    except Exception as exc:
+        print(f"OSM_INDEX_FAILED error={type(exc).__name__} detail={exc!r}")
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(
+            "# © OpenStreetMap contributors, ODbL; regional extracts supplied by Geofabrik\\n",
+            encoding="utf-8",
+        )
+        print("OSM_OPTIONAL_SOURCE_UNAVAILABLE continuing_without_osm=true cache_written=false")
+        return 0
+
     successful_regions = 0
     for region_id in REGIONS[args.market]:
         try:
             extract_region(index, region_id, work, handler)
             successful_regions += 1
         except Exception as exc:
-            print(f"OSM_REGION_FAILED id={region_id} error={type(exc).__name__}")
+            print(f"OSM_REGION_FAILED id={region_id} error={type(exc).__name__} detail={exc!r}")
     if successful_regions == 0:
-        raise RuntimeError("No Geofabrik regions could be processed; refusing to cache an empty result.")
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(
+            "# © OpenStreetMap contributors, ODbL; regional extracts supplied by Geofabrik\\n",
+            encoding="utf-8",
+        )
+        print("OSM_OPTIONAL_SOURCE_UNAVAILABLE continuing_without_osm=true cache_written=false")
+        return 0
+
     urls = sorted(handler.urls)
     output.parent.mkdir(parents=True, exist_ok=True)
     lines = [
