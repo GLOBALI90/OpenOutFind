@@ -87,7 +87,7 @@ def extract_region(index: dict, region_id: str, out_dir: Path, handler) -> int:
             size = local.stat().st_size
             with local.open("rb") as source:
                 header = source.read(4)
-            if size < 100 or header != b"\\x00\\x00\\x00\\x0d":
+            if size < 100 or header != b"\x00\x00\x00\x0d":
                 raise RuntimeError(f"download is not a valid PBF file (bytes={size}, header={header!r})")
             print(f"OSM_DOWNLOAD_DONE region={region_id} attempt={attempt} size_mb={size / (1024 * 1024):.1f}")
             last_error = None
