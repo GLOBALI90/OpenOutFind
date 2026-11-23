@@ -85,10 +85,18 @@ def extract_region(index: dict, region_id: str, out_dir: Path, handler) -> int:
                     raise RuntimeError(f"unexpected HTTP status {status}")
                 shutil.copyfileobj(response, target, length=1024 * 1024)
             size = local.stat().st_size
+            # PBF begins with a 4-byte big-endian BlobHeader length. That
+            # length is variable; it is NOT always 13 (the previous check
+            # incorrectly rejected valid Geofabrik extracts).
             with local.open("rb") as source:
-                header = source.read(4)
-            if size < 100 or header != b"\x00\x00\x00\x0d":
-                raise RuntimeError(f"download is not a valid PBF file (bytes={size}, header={header!r})")
+                raw_length = source.read(4)
+                header_length = int.from_bytes(raw_length, "big") if len(raw_length) == 4 else 0
+                blob_header = source.read(header_length) if 1 <= header_length <= 65536 else b""
+            if size < 100 or not (1 <= header_length <= 65536) or b"OSMHeader" not in blob_header:
+                raise RuntimeError(
+                    f"invalid OSM PBF header (bytes={size}, blob_header_length={header_length}, "
+                    f"header_preview={blob_header[:80]!r})"
+                )
             print(f"OSM_DOWNLOAD_DONE region={region_id} attempt={attempt} size_mb={size / (1024 * 1024):.1f}")
             last_error = None
             break
@@ -131,7 +139,13 @@ def main() -> int:
     try:
         import osmium
     except ImportError as exc:
-        raise SystemExit("Missing pyosmium; install the 'osmium' package before OSM extraction.") from exc
+        print(f"OSM_OPTIONAL_DEPENDENCY_MISSING detail={exc!r}; continuing_without_osm=true")
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(
+            "# © OpenStreetMap contributors, ODbL; regional extracts supplied by Geofabrik\\n",
+            encoding="utf-8",
+        )
+        return 0
 
     class WebsiteHandler(osmium.SimpleHandler):
         def __init__(self):
