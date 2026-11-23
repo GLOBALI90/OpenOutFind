@@ -142,7 +142,7 @@ jobs:
           Path("diesel_seeds.txt").write_text("\\n".join(ordered) + ("\\n" if ordered else ""), encoding="utf-8")
           print(f"SEED_PRIORITY_ORDER manual_search_osm unique_domains={len(ordered)}")
           PY
-          echo "DISCOVERED_SEED_URLS=$(grep -c '^https?://' diesel_seeds.txt || true)"
+          echo "DISCOVERED_SEED_URLS=$(grep -Ec '^https?://' diesel_seeds.txt || true)"
 
       - name: Read existing Leads and collect genuinely new companies
         env:
