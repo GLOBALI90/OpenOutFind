@@ -32,7 +32,7 @@ PRODUCT_TERMS = {
     "metals_minerals": ("sulphur", "sulfur", "iron ore", "copper cathode", "steel", "bauxite", "zinc", "lead", "coal"),
     "industrial_materials": ("cement", "construction materials", "industrial materials"),
 }
-BUYING_SIGNALS = ("request for quotation", "rfq", "request for proposal", "rfi", "tender", "procurement", "purchase order", "supplier registration", "bid submission", "buying", "sourcing", "quotation", "supply requirement")
+BUYING_SIGNALS = ("request for quotation", "request for quote", "rfq", "request for proposal", "rfi", "invitation to tender", "invitation to bid", "open tender", "tender notice", "procurement notice", "supplier registration", "bid submission", "buy lead", "supply requirement")
 DIESEL_TERMS = PRODUCT_TERMS["oil_gas_fuels"]
 EXISTING_COMPANY_DOMAINS: set[str] = set()
 
@@ -276,7 +276,8 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
         "collected_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "country": "",
         "city": "",
-        "buyer_type": "public_buying_signal" if signal else "product_or_sector_candidate_needs_confirmation",
+        "buyer_type": "public_buying_signal_text" if signal else "product_or_sector_candidate_needs_confirmation",
+        "purchase_status": "public_rfq_or_tender_terms_found_not_verified" if signal else "no_explicit_rfq_signal_found",
         "product_evidence": product_hits,
         "buying_signal_terms": buying_hits,
         "diesel_evidence_terms": diesel_hits,
