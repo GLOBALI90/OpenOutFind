@@ -69,11 +69,12 @@ def extract_region(index: dict, region_id: str, out_dir: Path, handler) -> int:
         raise RuntimeError(f"Geofabrik index has no PBF URL for region id={region_id}")
     local = out_dir / (region_id.rsplit("/", 1)[-1] + ".osm.pbf")
     print(f"OSM_DOWNLOAD_START region={region_id} url={pbf_url}")
-    # Geofabrik extracts are large; transient disconnects and throttling can
-    # leave partial files. Retry clean downloads and validate the PBF header.
+    # Retry the complete download + validation + parse operation. A truncated
+    # transfer or transient parser error should not poison the next attempt.
     last_error = None
     for attempt in range(1, 4):
         local.unlink(missing_ok=True)
+        urls_before = dict(handler.urls)
         request = urllib.request.Request(
             pbf_url,
             headers={"User-Agent": USER_AGENT, "Accept": "application/octet-stream"},
@@ -84,10 +85,9 @@ def extract_region(index: dict, region_id: str, out_dir: Path, handler) -> int:
                 if status != 200:
                     raise RuntimeError(f"unexpected HTTP status {status}")
                 shutil.copyfileobj(response, target, length=1024 * 1024)
+
             size = local.stat().st_size
-            # PBF begins with a 4-byte big-endian BlobHeader length. That
-            # length is variable; it is NOT always 13 (the previous check
-            # incorrectly rejected valid Geofabrik extracts).
+            # PBF starts with a 4-byte big-endian BlobHeader length; it varies.
             with local.open("rb") as source:
                 raw_length = source.read(4)
                 header_length = int.from_bytes(raw_length, "big") if len(raw_length) == 4 else 0
@@ -98,27 +98,23 @@ def extract_region(index: dict, region_id: str, out_dir: Path, handler) -> int:
                     f"header_preview={blob_header[:80]!r})"
                 )
             print(f"OSM_DOWNLOAD_DONE region={region_id} attempt={attempt} size_mb={size / (1024 * 1024):.1f}")
-            last_error = None
-            break
+
+            before = len(handler.urls)
+            handler.apply_file(str(local), locations=False)
+            count = len(handler.urls) - before
+            print(f"OSM_REGION_PARSED region={region_id} attempt={attempt} new_websites={count}")
+            local.unlink(missing_ok=True)
+            return count
         except Exception as exc:
             last_error = exc
-            print(f"OSM_DOWNLOAD_RETRY region={region_id} attempt={attempt}/3 error={type(exc).__name__} detail={exc!r}")
+            handler.urls.clear()
+            handler.urls.update(urls_before)
+            print(f"OSM_ATTEMPT_FAILED region={region_id} attempt={attempt}/3 error={type(exc).__name__} detail={exc!r}")
             local.unlink(missing_ok=True)
             if attempt < 3:
                 time.sleep(3 * attempt)
-    if last_error is not None:
-        raise RuntimeError(f"Geofabrik PBF download failed after 3 attempts: {last_error!r}") from last_error
 
-    before = len(handler.urls)
-    try:
-        handler.apply_file(str(local), locations=False)
-    except Exception as exc:
-        raise RuntimeError(f"pyosmium failed parsing region={region_id} file_bytes={local.stat().st_size}: {exc!r}") from exc
-    finally:
-        local.unlink(missing_ok=True)
-    count = len(handler.urls) - before
-    print(f"OSM_REGION_PARSED region={region_id} new_websites={count}")
-    return count
+    raise RuntimeError(f"Geofabrik download/parse failed after 3 attempts: {last_error!r}") from last_error
 
 
 def main() -> int:
