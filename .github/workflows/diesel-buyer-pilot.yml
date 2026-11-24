@@ -86,6 +86,16 @@ jobs:
             exit 1
           fi
 
+      - name: Discover fresh public procurement signals (RSS; review-only)
+        env:
+          MARKET: ${{ inputs.market }}
+        run: |
+          python -m py_compile diesel_leads/public_signal_discovery.py
+          python diesel_leads/public_signal_discovery.py \
+            --market "$MARKET" \
+            --days 30 \
+            --output public_buyer_signals.jsonl
+
       - name: Qualify discovered signals (triage only)
         run: |
           python -m py_compile diesel_leads/signal_qualifier.py
@@ -138,6 +148,8 @@ jobs:
           path: |
             diesel_leads.jsonl
             diesel_seeds.txt
+            public_buyer_signals.jsonl
+            qualified_buyer_signals.jsonl
             buyer_evidence_verification.jsonl
           if-no-files-found: ignore
           retention-days: 14
