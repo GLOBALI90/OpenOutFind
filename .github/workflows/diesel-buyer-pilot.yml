@@ -86,6 +86,13 @@ jobs:
             exit 1
           fi
 
+      - name: Qualify discovered signals (triage only)
+        run: |
+          python -m py_compile diesel_leads/signal_qualifier.py
+          python diesel_leads/signal_qualifier.py \
+            --input public_buyer_signals.jsonl \
+            --output qualified_buyer_signals.jsonl
+
       - name: Read existing Leads and collect multi-product buyer evidence
         env:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
