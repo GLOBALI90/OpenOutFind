@@ -9,6 +9,13 @@ This workflow lives inside the existing OpenOutFind repository and uses the exis
 - Records direct diesel/gasoil wording separately from sector-only candidates. A mine, fleet, port, or factory is not labelled a confirmed diesel buyer unless its public pages contain direct diesel-related evidence.
 - Extracts public business emails and ordinary phone numbers. WhatsApp is marked only from an explicit public click-to-chat link.
 
+## Source verification (second stage)
+- After the seed collector writes `diesel_leads.jsonl`, the workflow re-fetches up to three source pages per candidate.
+- It follows the same host only, respects `robots.txt`, uses bounded requests, and fails closed on robots/network errors (a missing robots file via HTTP 404/410 is treated as no published rules).
+- It reports source-page product/procurement wording, public emails/phones, active tender clues, short evidence excerpts, and fetch failures in `buyer_evidence_verification.jsonl`.
+- Verification output is a separate review artifact; it does not upgrade a company to a confirmed buyer, write verification-only contacts into Leads, or send outreach. The operator must check the tender date, buyer identity, scope, supplier eligibility, and transaction compliance.
+- The RSS/news discovery experiment was removed from the workflow because the feed's stated terms restrict use to personal/non-commercial feed reading; the current pipeline is based on user-selected public company/procurement sources.
+
 ## Outreach
 - Email drafts are stored in the same Leads row as `email_outreach_subject`, `email_outreach_body`, `email_outreach_recipient`, and `email_outreach_status=draft_ready`.
 - Live email is available only when the manual run is explicitly set to `outreach_mode=send`. It requires `GMAIL_USERNAME` and `GMAIL_APP_PASSWORD` repository secrets.
