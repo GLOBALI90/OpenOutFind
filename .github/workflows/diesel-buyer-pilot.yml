@@ -14,6 +14,17 @@ on:
           - Middle East
           - China
         default: Africa
+      priority:
+        description: "Select the fastest-to-follow-up campaign"
+        required: true
+        type: choice
+        options:
+          - "Fast buyer signals (recommended)"
+          - "Fuel and petroleum buyers"
+          - "Chemicals and petrochemicals"
+          - "Automation and instrumentation"
+          - "All catalog categories"
+        default: "Fast buyer signals (recommended)"
       seed_urls:
         description: "Public procurement/company sources, one URL per line (editable)"
         required: true
@@ -79,11 +90,21 @@ jobs:
         env:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
+          CAMPAIGN_PRIORITY: ${{ inputs.priority }}
+        shell: bash
         run: |
+          case "$CAMPAIGN_PRIORITY" in
+            "Fuel and petroleum buyers") PRIORITY=fuel_buyers ;;
+            "Chemicals and petrochemicals") PRIORITY=chemicals ;;
+            "Automation and instrumentation") PRIORITY=automation_instrumentation ;;
+            "All catalog categories") PRIORITY=all_catalog ;;
+            *) PRIORITY=fast_buying_signals ;;
+          esac
           python diesel_leads/collector.py \\
             --seeds diesel_seeds.txt \\
             --market "${{ inputs.market }}" \\
             --max-pages "${{ inputs.max_pages_per_company }}" \\
+            --priority "$PRIORITY" \\
             --output diesel_leads.jsonl
 
       - name: Merge new evidence into existing Leads rows
