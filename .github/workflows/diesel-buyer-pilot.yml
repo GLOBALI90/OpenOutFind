@@ -28,14 +28,14 @@ on:
           https://www.sibanyestillwater.com/suppliers/south-africa/procurement-contacts/
           https://www.yokogawa.com/mea/industries/oil-gas/
       max_pages_per_company:
-        description: "Maximum same-site pages to inspect per URL"
+        description: "Small first batch for faster feedback; 3 recommended"
         required: true
         type: choice
         options:
           - "3"
           - "5"
           - "8"
-        default: "5"
+        default: "3"
 
 permissions:
   contents: read
