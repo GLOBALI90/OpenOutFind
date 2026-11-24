@@ -100,8 +100,15 @@ def allowed(url):
         with urllib.request.urlopen(req, timeout=8) as res:
             rp.parse(res.read(200_000).decode("utf-8", "replace").splitlines())
         return rp.can_fetch(UA, url)
+    except urllib.error.HTTPError as exc:
+        # A 404/410 robots file means the site has no published exclusion file.
+        if exc.code in (404, 410):
+            rp.parse([])
+            return True
+        # Access denied or server error: do not crawl.
+        return False
     except Exception:
-        # Fail closed if robots cannot be fetched in this verifier.
+        # Network/timeout failure: fail closed.
         return False
 
 
