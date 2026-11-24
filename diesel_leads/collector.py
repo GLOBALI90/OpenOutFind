@@ -326,8 +326,9 @@ def main() -> int:
             )
             row["previously_in_leads"] = row["website_domain"] in EXISTING_COMPANY_DOMAINS
             rows[row["lead_key"]] = row
+    ordered_rows = sorted(rows.values(), key=lambda row: (row.get("qualification_score", 0), bool(row.get("buying_signal_terms")), bool(row.get("commercial_emails"))), reverse=True)
     with Path(args.output).open("w", encoding="utf-8") as handle:
-        for row in rows.values():
+        for row in ordered_rows:
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
     existing_count = sum(1 for row in rows.values() if row.get("previously_in_leads"))
     print(
