@@ -86,18 +86,6 @@ jobs:
             exit 1
           fi
 
-      - name: Syntax-check discovery module
-        run: python -m py_compile diesel_leads/public_signal_discovery.py
-
-      - name: Discover fresh public procurement signals (RSS; review-only)
-        env:
-          MARKET: ${{ inputs.market }}
-        run: |
-          python diesel_leads/public_signal_discovery.py \
-            --market "$MARKET" \
-            --days 30 \
-            --output public_buyer_signals.jsonl
-
       - name: Read existing Leads and collect multi-product buyer evidence
         env:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
@@ -119,6 +107,14 @@ jobs:
             --priority "$PRIORITY" \\
             --output diesel_leads.jsonl
 
+      - name: Verify source pages and extract buyer evidence (review-only)
+        run: |
+          python -m py_compile diesel_leads/verify_buyer_evidence.py
+          python diesel_leads/verify_buyer_evidence.py \
+            --input diesel_leads.jsonl \
+            --output buyer_evidence_verification.jsonl \
+            --max-sources 3
+
       - name: Merge new evidence into existing Leads rows
         env:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
@@ -135,6 +131,6 @@ jobs:
           path: |
             diesel_leads.jsonl
             diesel_seeds.txt
-            public_buyer_signals.jsonl
+            buyer_evidence_verification.jsonl
           if-no-files-found: ignore
           retention-days: 14
