@@ -190,7 +190,7 @@ def _contact_data(text: str, links: list[str]) -> tuple[list[str], list[str], li
     return emails, phones, sorted(wa_numbers), status
 
 
-def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | None:
+def collect_company(seed_url: str, market: str, max_pages: int = 5, priority: str = "fast_buying_signals") -> dict | None:
     seed_url = seed_url.strip()
     if not _public_http_url(seed_url):
         return None
@@ -251,7 +251,15 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
     emails, phones, whatsapp, wa_status = _contact_data(" ".join(all_text), all_links)
     direct = bool(diesel_hits)
     signal = bool(buying_hits)
-    score = min(100, (40 if direct else 20 if product_hits else 0) + min(20, 5 * len(product_hits)) + (15 if signal else 0) + min(10, 5 * len(sector_hits)) + (5 if emails else 0) + (5 if phones else 0))
+    priority_categories = {
+        "fast_buying_signals": {"oil_gas_fuels", "industrial_chemicals", "automation_instrumentation"},
+        "fuel_buyers": {"oil_gas_fuels"},
+        "chemicals": {"petrochemicals", "industrial_chemicals"},
+        "automation_instrumentation": {"automation_instrumentation", "energy"},
+        "all_catalog": set(PRODUCT_TERMS),
+    }.get(priority, set(PRODUCT_TERMS))
+    priority_hits = sorted(set(product_hits) & priority_categories)
+    score = min(100, (40 if direct else 20 if product_hits else 0) + min(20, 5 * len(product_hits)) + (20 if signal else 0) + min(10, 5 * len(sector_hits)) + (5 if emails else 0) + (5 if phones else 0) + (10 if priority_hits else 0))
     domain = host.removeprefix("www.")
     key = hashlib.sha256(domain.encode("utf-8")).hexdigest()[:24]
     return {
@@ -260,7 +268,7 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
         "company_name": company_name,
         "website": f"{parsed_seed.scheme}://{parsed_seed.netloc}",
         "website_domain": domain,
-        "market_search_bucket": market,
+        "market_search_bucket": market,\n        "campaign_priority": priority,\n        "priority_product_matches": priority_hits,
         "target_market": market,
         "source": f"Public company website: {parsed_seed.scheme}://{parsed_seed.netloc}",
         "source_provider": "public_company_website",
@@ -298,7 +306,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--seeds", required=True, help="Text file containing one public company/directory URL per line")
     parser.add_argument("--market", default="China", choices=("Worldwide", "Africa", "Asia", "Middle East", "China"))
-    parser.add_argument("--max-pages", type=int, default=5)
+    parser.add_argument("--max-pages", type=int, default=3)\n    parser.add_argument("--priority", default="fast_buying_signals", choices=("fast_buying_signals", "fuel_buyers", "chemicals", "automation_instrumentation", "all_catalog"))
     parser.add_argument("--output", default="diesel_leads.jsonl")
     args = parser.parse_args()
     global EXISTING_COMPANY_DOMAINS
@@ -309,7 +317,7 @@ def main() -> int:
         seed = line.strip()
         if not seed or seed.startswith("#"):
             continue
-        row = collect_company(seed, args.market, max(1, min(args.max_pages, 10)))
+        row = collect_company(seed, args.market, max(1, min(args.max_pages, 10)), args.priority)
         if row:
             row["record_status"] = (
                 "existing_company_refresh"
