@@ -34,15 +34,18 @@ DIESEL_TERMS = (
     "وقود الديزل", "شراء الديزل", "مولدات الديزل", "زيت الغاز",
 )
 FUEL_PRODUCT_TERMS = {
-    "natural_gas": ("natural gas", "pipeline gas", "methane", "گاز طبیعی", "ګاز طبیعي"),
-    "lpg": ("lpg", "liquefied petroleum gas", "propane", "butane", "گاز مایع", "گاز مایع نفتی", "پروپان", "بوتان"),
-    "cng": ("cng", "compressed natural gas", "گاز فشرده", "ګاز فشرده"),
-    "lng": ("lng", "liquefied natural gas", "گاز طبیعی مایع"),
-    "diesel_gasoil": DIESEL_TERMS,
-    "gasoline": ("gasoline", "petrol", "motor spirit", "بنزین", "پټرول"),
-    "fuel_oil_mazut": ("fuel oil", "heavy fuel oil", "hfo", "mazut", "مازوت", "نفت کوره"),
-    "kerosene_jet": ("kerosene", "jet fuel", "aviation fuel", "نفت سفید", "سوخت جت"),
-    "other_petroleum": ("naphtha", "bitumen", "asphalt", "petroleum coke", "نفتا", "قیر", "کک نفتی"),
+    "diesel_gasoil": ("diesel", "gasoil", "gas oil", "diesel fuel", "EN590", "Euro 4 diesel", "Euro 5 diesel", "گازوئیل", "سوخت دیزل"),
+    "gasoline": ("gasoline", "petrol", "motor spirit", "بنزین"),
+    "lpg_propane_butane": ("lpg", "liquefied petroleum gas", "propane", "butane", "گاز مایع", "پروپان", "بوتان"),
+    "fuel_oil": ("fuel oil", "heavy fuel oil", "HFO", "mazut", "نفت کوره", "مازوت"),
+    "naphtha": ("light naphtha", "heavy naphtha", "naphtha", "نفتا"),
+    "petroleum_solvents": ("petroleum solvent", "hydrocarbon solvent", "industrial solvent", "حلال نفتی", "حلال هیدروکربنی"),
+    "sulfur": ("granular sulfur", "granular sulphur", "sulfur", "sulphur", "گوگرد"),
+    "vacuum_bottoms": ("vacuum bottom", "vacuum bottoms", "vacuum residue", "VB", "bitumen feedstock", "وکیوم باتوم"),
+    "lubcut_base_oil_feed": ("lubcut", "lub cut", "base oil feedstock", "lubricant base oil refinery", "برش روغنی"),
+    "kerosene_aviation": ("kerosene", "jet fuel", "aviation turbine fuel", "ATK", "JP4", "نفت سفید", "سوخت هواپیما"),
+    "refinery_recycle_cuts": ("isorecycle", "iso recycle", "refinery recycle stream", "petroleum cut", "برش نفتی"),
+    "liquid_nitrogen_co2": ("liquid nitrogen", "industrial carbon dioxide", "CO2 for dry ice", "نیتروژن مایع", "دی اکسید کربن صنعتی"),
 }
 EXISTING_COMPANY_DOMAINS: set[str] = set()
 SUCCESSFULLY_FETCHED_DOMAINS: set[str] = set()
@@ -50,24 +53,17 @@ OSM_SEED_DOMAINS: set[str] = set()
 CHECKED_DOMAINS_FILE = Path('.cache/diesel_checked_domains_v2.txt')
 
 BUYER_SECTOR_TERMS = {
-    "fuel_importer_distributor": ("fuel importer", "diesel importer", "gasoil importer", "petroleum products importer", "oil marketing company", "fuel distributor", "petroleum distributor", "bulk fuel supplier", "importateur de gasoil", "importateur de carburants", "distributeur de carburants", "distribution de produits pétroliers", "société pétrolière", "مستورد الديزل", "مستورد السولار", "استيراد السولار", "توزيع الوقود", "موزع الوقود", "شركة تسويق المنتجات البترولية"),
-    "mining": ("mining", "mine operator", "mineral processing", "矿业", "矿山", "minière", "تعدين", "mineração"),
-    "transport_logistics": ("trucking", "haulage", "logistics fleet", "transport fleet", "物流", "运输车队", "flotte de camions", "أسطول النقل"),
-    "shipping_ports": ("shipping", "marine fleet", "port operator", "vessel", "港口", "航运", "ميناء", "portuaire"),
-    "construction": ("construction equipment", "earthmoving", "heavy equipment", "工程机械", "重型设备", "équipement lourd"),
-    "power_generation": ("power plant", "backup generator", "power generation", "发电厂", "发电", "محطة توليد الكهرباء", "centrale électrique"),
-    "cement_manufacturing": ("cement plant", "cement manufacturing", "industrial manufacturing", "水泥厂", "水泥制造", "cimenterie"),
-    "food_processing": ("food processing plant", "food manufacturing", "food factory", "食品加工", "مصنع مواد غذائية"),
-    "textile_manufacturing": ("textile mill", "textile factory", "textile manufacturing", "نساجی", "کارخانه نساجی"),
-    "agriculture": ("agricultural machinery", "farm equipment", "commercial farming", "irrigation pump", "tractor fleet", "农业机械", "machinerie agricole", "زراعة"),
-    "oilfield_services": ("oilfield services", "drilling contractor", "well services", "油田", "خدمات حقول النفط", "services pétroliers"),
-    "generator_rental": ("generator rental", "genset rental", "power rental", "柴油发电机组租赁", "تأجير مولدات"),
-    "telecom_power": ("telecom tower", "cell tower", "mobile network tower", "通信基站", "أبراج الاتصالات"),
-    "rail_freight": ("rail freight", "diesel locomotive", "railway operator", "铁路", "locomotive diesel"),
-    "airport_ground_ops": ("ground handling", "airport ground support equipment", "机场地勤", "مناولة أرضية"),
-    "waste_management": ("waste collection fleet", "municipal truck fleet", "waste management", "垃圾运输", "إدارة النفايات"),
-    "data_centres": ("data centre", "data center", "backup power", "数据中心", "مركز بيانات"),
-    "industrial_manufacturing": ("industrial plant", "manufacturing facility", "factory operations", "工厂", "مصنع صناعي"),
+    "fuel_importer_distributor": ("fuel importer", "diesel importer", "gasoil importer", "petroleum products importer", "oil marketing company", "fuel distributor", "petroleum distributor", "bulk fuel buyer", "fuel procurement", "مستورد سوخت", "واردکننده فرآورده نفتی", "توزیع فرآورده نفتی"),
+    "industrial_fuel_consumers": ("industrial fuel procurement", "diesel consumption", "fuel purchasing", "power plant fuel", "cement plant fuel", "fleet fuel buyer", "مصرف کننده صنعتی سوخت", "خرید گازوئیل صنعتی"),
+    "petrochemical_downstream": ("petrochemical feedstock", "naphtha cracker", "hydrocarbon processing", "downstream refinery", "petroleum feedstock buyer", "پتروشیمی", "فرآوری هیدروکربن"),
+    "bitumen_asphalt": ("bitumen producer", "asphalt plant", "bitumen feedstock", "قیرسازی", "کارخانه قیر"),
+    "sulfur_chemical_fertilizer": ("sulfuric acid plant", "sulphuric acid manufacturer", "fertilizer manufacturer", "sulfur procurement", "کارخانه اسید سولفوریک", "تولید کود شیمیایی"),
+    "solvent_paint_resin": ("solvent manufacturer", "paint manufacturer", "resin producer", "adhesive manufacturer", "industrial coatings", "تولید رنگ", "رزین", "چسب صنعتی"),
+    "lubricant_base_oil": ("base oil refinery", "lubricant manufacturer", "lubricating oil producer", "base oil feedstock", "تولید روغن پایه", "روغن روانکار"),
+    "lpg_bulk_distribution": ("LPG distributor", "propane importer", "butane importer", "bulk LPG terminal", "گاز مایع عمده"),
+    "aviation_fuel_qualified": ("aviation fuel supplier", "airport fuel procurement", "jet fuel importer", "سوخت‌رسانی فرودگاهی"),
+    "industrial_gas_dry_ice": ("industrial gas supplier", "liquid nitrogen user", "dry ice manufacturer", "گازهای صنعتی", "تولید یخ خشک"),
+    "procurement_evidence": ("request for quotation", "RFQ", "purchase tender", "procurement notice", "supplier registration", "import tender", "درخواست خرید", "مناقصه خرید"),
 }
 CONTACT_PATH_HINTS = ("contact", "about", "company", "location", "procurement", "fuel", "fleet", "operations", "services", "projects", "facilities", "energy", "business")
 
