@@ -1,66 +1,52 @@
-name: Tehran refinery product buyer research and consent-gated outreach
+name: Simple refinery product customer collection
 
 on:
   schedule:
-    - cron: "0 */3 * * *"
+    # One low-frequency collection run; manually dispatch for an immediate batch.
+    - cron: "0 4 * * 1"
   workflow_dispatch:
     inputs:
       market:
-        description: "Market for this manual batch"
+        description: "Market to collect"
         required: true
         type: choice
         options:
-          - Global
+          - Iran + Iraq
           - Iran
           - Iraq
-          - Iran + Iraq
+          - Global
         default: Iran + Iraq
       target_new_leads:
-        description: "Maximum genuinely new company records for this run"
+        description: "Maximum new companies to add in this batch (repeat runs deduplicate)"
         required: true
         type: choice
         options:
-          - "10"
-          - "20"
-          - "30"
-        default: "10"
+          - "100"
+          - "250"
+          - "500"
+        default: "500"
       seed_urls:
-        description: "Optional extra public company URLs, one per line (automatic discovery runs too)"
+        description: "Optional public company URLs, one per line (automatic discovery also runs)"
         required: false
         type: string
       max_pages_per_company:
-        description: "Maximum same-site pages to inspect per discovered company"
+        description: "Same-site pages to inspect per company"
         required: true
         type: choice
         options:
           - "3"
           - "5"
         default: "3"
-      send_email:
-        description: "Enable email channel; only explicitly eligible contacts can receive (20/day max)"
-        required: true
-        type: boolean
-        default: true
-      send_whatsapp:
-        description: "Enable WhatsApp channel; only explicit opt-ins can receive (5/day max)"
-        required: true
-        type: boolean
-        default: true
-      dry_run:
-        description: "Safety mode: true = no sends; false = send only contacts with explicit channel eligibility/opt-in"
-        required: true
-        type: boolean
-        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: iran-iraq-refinery-research-manual
+  group: simple-refinery-customer-collection
   cancel-in-progress: false
 
 jobs:
-  collect_only:
+  collect:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -72,61 +58,42 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Resolve market and batch target
+      - name: Resolve run settings
         shell: bash
         env:
           INPUT_MARKET: ${{ inputs.market }}
           INPUT_TARGET: ${{ inputs.target_new_leads }}
+          INPUT_SEEDS: ${{ inputs.seed_urls }}
         run: |
           set -euo pipefail
-          MARKET="${INPUT_MARKET:-Iran + Iraq}"
-          TARGET_NEW="${INPUT_TARGET:-10}"
-          echo "MARKET=$MARKET" >> "$GITHUB_ENV"
-          echo "TARGET_NEW=$TARGET_NEW" >> "$GITHUB_ENV"
-          echo "Batch market=$MARKET target_new=$TARGET_NEW"
+          echo "MARKET=${INPUT_MARKET:-Iran + Iraq}" >> "$GITHUB_ENV"
+          echo "TARGET_NEW=${INPUT_TARGET:-500}" >> "$GITHUB_ENV"
+          printf '%s\\n' "${INPUT_SEEDS:-}" > manual_seeds.txt
 
-      - name: Validate Google Sheets configuration
+      - name: Validate Sheets connection
         env:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
-          MANUAL_SEEDS: ${{ inputs.seed_urls }}
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "${GOOGLE_SHEETS_API_URL}" || -z "${GOOGLE_SHEETS_API_TOKEN}" ]]; then
+          if [[ -z "$GOOGLE_SHEETS_API_URL" || -z "$GOOGLE_SHEETS_API_TOKEN" ]]; then
             echo "Missing Google Sheets bridge secrets."
             exit 1
           fi
-          printf '%s\n' "${MANUAL_SEEDS:-}" > manual_seeds.txt
-          : > diesel_seeds.txt
 
-      - name: Restore cached OpenStreetMap company website seeds
-        uses: actions/cache@v4
-        with:
-          path: |
-            .cache/osm_seeds_Afghanistan.txt
-            .cache/osm_seed_domains.txt
-          key: osm-seeds-v1-${{ github.run_id }}
-          restore-keys: |
-            osm-seeds-v1-
-
-      - name: Discover fresh company websites from public web search
-        env:
-          GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
-          GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
+      - name: Discover public company websites
         run: |
           set -euo pipefail
-          # Search only Tehran-refinery product families; exclude unrelated minerals and broad multi-fuel categories.
-          python scripts/discover_tehran_refinery_buyers.py --limit 150 --output discovered_seeds.txt --social-output social_buyer_evidence.csv
+          python scripts/discover_tehran_refinery_buyers.py --limit 300 --output discovered_seeds.txt --social-output social_buyer_evidence.csv
           if [[ "$MARKET" == "Iran + Iraq" ]]; then
-            python scripts/discover_osm_refinery_buyers.py --market Iran --output osm_iran_seeds.txt --evidence osm_iran_evidence.csv
-            python scripts/discover_osm_refinery_buyers.py --market Iraq --output osm_iraq_seeds.txt --evidence osm_iraq_evidence.csv
+            python scripts/discover_osm_refinery_buyers.py --market Iran --limit 500 --output osm_iran_seeds.txt --evidence osm_iran_evidence.csv
+            python scripts/discover_osm_refinery_buyers.py --market Iraq --limit 500 --output osm_iraq_seeds.txt --evidence osm_iraq_evidence.csv
             cat osm_iran_seeds.txt osm_iraq_seeds.txt > osm_seeds.txt
             { head -n 1 osm_iran_evidence.csv; tail -n +2 osm_iran_evidence.csv; tail -n +2 osm_iraq_evidence.csv; } > osm_buyer_evidence.csv
           else
-            python scripts/discover_osm_refinery_buyers.py --market "$MARKET" --output osm_seeds.txt --evidence osm_buyer_evidence.csv
+            python scripts/discover_osm_refinery_buyers.py --market "$MARKET" --limit 500 --output osm_seeds.txt --evidence osm_buyer_evidence.csv
           fi
-          # Preserve relevance order: manual URLs first, refinery-specific discoveries second; no broad OSM industry seeds.
           python - <<'PY'
           from pathlib import Path
           from urllib.parse import urlsplit, urldefrag
@@ -149,19 +116,22 @@ jobs:
                   seen_urls.add(key)
                   seen_domains.add(domain)
                   ordered.append(url)
-          Path("diesel_seeds.txt").write_text("\n".join(ordered) + ("\n" if ordered else ""), encoding="utf-8")
-          print(f"SEED_PRIORITY_ORDER manual_search_osm unique_domains={len(ordered)}")
+          Path("diesel_seeds.txt").write_text("\\n".join(ordered) + ("\\n" if ordered else ""), encoding="utf-8")
+          print(f"SEED_LIST_READY unique_company_domains={len(ordered)}")
           PY
           echo "DISCOVERED_SEED_URLS=$(grep -Ec '^https?://' diesel_seeds.txt || true)"
 
-      - name: Read existing Leads and collect genuinely new companies
+      - name: Collect and deduplicate company records
         env:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
         run: |
-          python diesel_leads/collector.py --seeds diesel_seeds.txt --market "$MARKET" --max-pages "${{ inputs.max_pages_per_company || '3' }}" --max-domains 60 --max-seconds 1500 --target-new "$TARGET_NEW" --output diesel_leads.jsonl
+          python diesel_leads/collector.py --seeds diesel_seeds.txt --market "$MARKET" --max-pages "${{ inputs.max_pages_per_company || '3' }}" --max-domains 250 --max-seconds 3000 --target-new "$TARGET_NEW" --output diesel_leads.jsonl
 
-      - name: Enrich company candidates with OSM contact tags (exact website match only)\n        run: python scripts/enrich_leads_from_osm.py diesel_leads.jsonl osm_buyer_evidence.csv\n\n      - name: Merge new evidence into existing Leads rows
+      - name: Add matching public OSM contacts
+        run: python scripts/enrich_leads_from_osm.py diesel_leads.jsonl osm_buyer_evidence.csv
+
+      - name: Save new leads and refresh existing companies in Google Sheets
         env:
           GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
           GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
@@ -169,31 +139,13 @@ jobs:
           python -m pip install requests
           python scripts/export_diesel_buyers_to_sheets.py diesel_leads.jsonl
 
-      # Scheduled runs send only to contacts already explicitly eligible/opted-in.
-      - name: Send consent-eligible outreach (scheduled and manually selected)
-        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (inputs.send_email || inputs.send_whatsapp))
-        env:
-          SEND_EMAIL: ${{ github.event_name == 'schedule' && 'true' || inputs.send_email }}
-          SEND_WHATSAPP: ${{ github.event_name == 'schedule' && 'true' || inputs.send_whatsapp }}
-          GOOGLE_SHEETS_API_URL: ${{ secrets.GOOGLE_SHEETS_API_URL }}
-          GOOGLE_SHEETS_API_TOKEN: ${{ secrets.GOOGLE_SHEETS_API_TOKEN }}
-          GMAIL_USERNAME: ${{ secrets.GMAIL_USERNAME }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-          WUAPI_API_KEY: ${{ secrets.WUAPI_API_KEY }}
-          DRY_RUN: ${{ github.event_name == 'schedule' && 'false' || inputs.dry_run }}
-        run: |
-          set -euo pipefail
-          ARGS=()
-          if [[ "$DRY_RUN" == "true" ]]; then ARGS+=(--dry-run); fi
-          if [[ "$SEND_EMAIL" == "true" ]]; then ARGS+=(--email); fi
-          if [[ "$SEND_WHATSAPP" == "true" ]]; then ARGS+=(--whatsapp); fi
-          python scripts/send_diesel_outreach.py "${ARGS[@]}"
+      # This workflow is collection-only. It never sends email or WhatsApp.
 
-      - name: Upload discovery and collection report
+      - name: Upload customer collection report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: tehran-refinery-product-buyer-research
+          name: refinery-customer-collection
           path: |
             discovered_seeds.txt
             osm_seeds.txt
