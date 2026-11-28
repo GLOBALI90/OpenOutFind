@@ -2,8 +2,8 @@ name: Simple refinery product customer collection
 
 on:
   schedule:
-    # One low-frequency collection run; manually dispatch for an immediate batch.
-    - cron: "0 4 * * 1"
+    # Daily quota-conscious collection; manual dispatch remains available for an extra batch.
+    - cron: "0 4 * * *"
   workflow_dispatch:
     inputs:
       market:
