@@ -19,6 +19,7 @@ COUNTRIES = {
     "Afghanistan": "Afghanistan",
     "Egypt": "Egypt",
     "Morocco": "Morocco",
+    "Iraq": "Iraq",
 }
 ENDPOINT = "https://overpass-api.de/api/interpreter"
 UA = "RojanGlobalRefineryBuyerResearch/1.0 (low-volume public OSM query; contact via rojanglobal.com)"
