@@ -139,6 +139,14 @@ jobs:
           python -m pip install requests
           python scripts/export_diesel_buyers_to_sheets.py diesel_leads.jsonl
 
+      - name: Send buyer report to Telegram (optional secrets)
+        if: always() && steps.collect.outcome == 'success'
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/notify_buyer_leads_telegram.py diesel_leads.jsonl
+
       # This workflow is collection-only. It never sends email or WhatsApp.
 
       - name: Upload customer collection report
