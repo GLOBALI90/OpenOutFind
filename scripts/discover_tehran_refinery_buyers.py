@@ -81,7 +81,7 @@ def main() -> int:
     seen: set[str] = set()
     social_rows: list[dict[str, str]] = []
     failures = 0
-    query_count = min(len(QUERIES), 96)  # keep Actions usage bounded
+    query_count = min(len(QUERIES), 60)  # bounded public search batch for Actions quota
     for i, (product, query) in enumerate(QUERIES[:query_count], 1):
         try:
             items = rss(query)
