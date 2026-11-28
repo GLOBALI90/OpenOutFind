@@ -13,7 +13,6 @@ on:
           - Global
           - Iran
           - Iraq
-          - Iran
           - Iran + Iraq
         default: Iran + Iraq
       target_new_leads:
@@ -80,7 +79,7 @@ jobs:
           INPUT_TARGET: ${{ inputs.target_new_leads }}
         run: |
           set -euo pipefail
-          MARKET="${INPUT_MARKET:-Global}"
+          MARKET="${INPUT_MARKET:-Iran + Iraq}"
           TARGET_NEW="${INPUT_TARGET:-10}"
           echo "MARKET=$MARKET" >> "$GITHUB_ENV"
           echo "TARGET_NEW=$TARGET_NEW" >> "$GITHUB_ENV"
