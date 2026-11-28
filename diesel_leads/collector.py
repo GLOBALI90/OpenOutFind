@@ -355,7 +355,7 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
             if domain in OSM_SEED_DOMAINS
             else "public_company_website"
         ),
-        "lead_segment": "Afghanistan multi-fuel buyer research",
+        "lead_segment": "Refinery product buyer research",
         "product_interest": ", ".join(product_categories),
         "fuel_product_categories": product_categories,
         "fuel_product_evidence_terms": product_evidence,
@@ -367,7 +367,7 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
         "evidence": "Fuel products: " + ", ".join(product_hits) + "; sectors: " + ", ".join(sorted(sector_hits)),
         "lead_score": score,
         "collected_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "country": market,
+        "country": market if market in {"Iran", "Iraq", "Afghanistan", "Egypt", "Morocco"} else "",
         "city": "",
         "buyer_type": ("fuel_importer_distributor_evidence" if "fuel_importer_distributor" in sector_hits else "direct_fuel_consumer_evidence"),
         "diesel_evidence_terms": product_evidence.get("diesel_gasoil", []),
@@ -383,7 +383,7 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
         "contact_validation": "format_only_not_mailbox_verified" if emails else "not_found",
         "qualification_score": score,
         "source_urls": sorted(set(source_urls)),
-        "evidence_note": "At least one named fuel product and a specific consumer/importer sector phrase were both found on the company website; buyer type still requires manual confirmation.",
+        "evidence_note": "At least one named refinery product and a relevant consumer/importer sector phrase were found on the public company website. This is a prospect signal, not confirmation of an active purchase, order volume, or the company’s physical country; verify during qualification.",
         "collected_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
 
@@ -391,12 +391,12 @@ def collect_company(seed_url: str, market: str, max_pages: int = 5) -> dict | No
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--seeds", required=True)
-    parser.add_argument("--market", default="Afghanistan", choices=("Global", "Iran", "Iraq", "Iran + Iraq", "Afghanistan", "Egypt", "Morocco"))
+    parser.add_argument("--market", default="Iran + Iraq", choices=("Global", "Iran", "Iraq", "Iran + Iraq", "Afghanistan", "Egypt", "Morocco"))
     parser.add_argument("--max-pages", type=int, default=3)
-    parser.add_argument("--max-domains", type=int, default=90)
-    parser.add_argument("--max-seconds", type=int, default=2100)
+    parser.add_argument("--max-domains", type=int, default=250)
+    parser.add_argument("--max-seconds", type=int, default=3000)
     parser.add_argument("--output", default="diesel_leads.jsonl")
-    parser.add_argument("--target-new", type=int, default=10)
+    parser.add_argument("--target-new", type=int, default=500)
     args = parser.parse_args()
     global EXISTING_COMPANY_DOMAINS, OSM_SEED_DOMAINS
     EXISTING_COMPANY_DOMAINS = read_existing_company_domains()
