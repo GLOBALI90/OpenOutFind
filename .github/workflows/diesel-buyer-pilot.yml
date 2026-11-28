@@ -68,7 +68,7 @@ jobs:
           set -euo pipefail
           echo "MARKET=${INPUT_MARKET:-Iran + Iraq}" >> "$GITHUB_ENV"
           echo "TARGET_NEW=${INPUT_TARGET:-500}" >> "$GITHUB_ENV"
-          printf '%s\\n' "${INPUT_SEEDS:-}" > manual_seeds.txt
+          printf '%s\n' "${INPUT_SEEDS:-}" > manual_seeds.txt
 
       - name: Validate Sheets connection
         env:
@@ -116,7 +116,7 @@ jobs:
                   seen_urls.add(key)
                   seen_domains.add(domain)
                   ordered.append(url)
-          Path("diesel_seeds.txt").write_text("\\n".join(ordered) + ("\\n" if ordered else ""), encoding="utf-8")
+          Path("diesel_seeds.txt").write_text("\n".join(ordered) + ("\n" if ordered else ""), encoding="utf-8")
           print(f"SEED_LIST_READY unique_company_domains={len(ordered)}")
           PY
           echo "DISCOVERED_SEED_URLS=$(grep -Ec '^https?://' diesel_seeds.txt || true)"
