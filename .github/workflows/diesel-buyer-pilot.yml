@@ -12,10 +12,9 @@ on:
         options:
           - Global
           - Iran
-          - Afghanistan
-          - Egypt
-          - Morocco
-        default: Global
+          - Iraq
+          - Iran
+        default: Iran
       target_new_leads:
         description: "Maximum genuinely new company records for this run"
         required: true
@@ -57,7 +56,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: afghanistan-multifuel-research-manual
+  group: iran-iraq-refinery-research-manual
   cancel-in-progress: false
 
 jobs:
