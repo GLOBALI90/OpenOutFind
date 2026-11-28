@@ -43,11 +43,12 @@ BUYER_TERMS = (
 SOCIAL_QUERY_SITES = ("site:linkedin.com/company", "site:facebook.com")
 QUERIES: list[tuple[str, str]] = []
 for product, terms in PRODUCTS.items():
-    for term in terms[:4]:
+    # Two high-signal product searches per family, plus one query per social platform.
+    for term in terms[:2]:
         QUERIES.append((product, f'"{term}" (buyer OR importer OR procurement OR purchase OR RFQ OR distributor) company'))
-        QUERIES.append((product, f'"{term}" industrial consumer purchasing company supplier'))
-        for site in SOCIAL_QUERY_SITES:
-            QUERIES.append((product, f'{site} "{term}" buyer importer procurement company'))
+    joined = " OR ".join(terms[:3])
+    for site in SOCIAL_QUERY_SITES:
+        QUERIES.append((product, f'{site} "{joined}" buyer importer procurement company'))
 
 def rss(query: str) -> list[dict[str, str]]:
     url = "https://www.bing.com/search?" + urllib.parse.urlencode(
@@ -81,7 +82,7 @@ def main() -> int:
     seen: set[str] = set()
     social_rows: list[dict[str, str]] = []
     failures = 0
-    query_count = min(len(QUERIES), 60)  # bounded public search batch for Actions quota
+    query_count = len(QUERIES)  # 4 queries per product family; fixed and predictable Actions cost
     for i, (product, query) in enumerate(QUERIES[:query_count], 1):
         try:
             items = rss(query)
