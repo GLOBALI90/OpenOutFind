@@ -66,7 +66,7 @@ def main() -> int:
             seen.add(host)
             urls.append(website)
             rows.append([market, tags.get("name", ""), website, json.dumps(tags, ensure_ascii=False, sort_keys=True), el.get("type", ""), el.get("id", "")])
-        Path(args.output).write_text("\\n".join(urls) + ("\\n" if urls else ""), encoding="utf-8")
+        Path(args.output).write_text("\n".join(urls) + ("\n" if urls else ""), encoding="utf-8")
         with Path(args.evidence).open("w", newline="", encoding="utf-8-sig") as f:
             w = csv.writer(f); w.writerow(["market", "name", "website", "tags", "osm_type", "osm_id"]); w.writerows(rows)
         print(f"OSM_DISCOVERY_DONE market={market} elements={len(payload.get('elements', []))} website_domains={len(urls)}")
