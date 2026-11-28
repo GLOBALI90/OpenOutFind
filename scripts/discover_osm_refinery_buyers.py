@@ -9,8 +9,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import os
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -47,8 +45,8 @@ def main() -> int:
         print(f"OSM_SKIPPED market={market!r}; choose a supported country for one bounded query")
         return 0
 
-    filters = "".join(TAG_FILTERS)
-    q = f'[out:json][timeout:45];area["name"="{COUNTRIES[market]}"]["boundary"="administrative"]["admin_level"="2"]->.a;(nwr(area.a){filters};);out center tags {max(1,min(args.limit,500))};'
+    filters = "".join(f"nwr(area.a){tag};" for tag in TAG_FILTERS)
+    q = f'[out:json][timeout:45];area["name"="{COUNTRIES[market]}"]["boundary"="administrative"]["admin_level"="2"]->.a;({filters});out center tags {max(1,min(args.limit,500))};'
     data = urllib.parse.urlencode({"data": q}).encode()
     req = urllib.request.Request(ENDPOINT, data=data, headers={"User-Agent": UA, "Content-Type": "application/x-www-form-urlencoded"})
     urls, rows, seen = [], [], set()
