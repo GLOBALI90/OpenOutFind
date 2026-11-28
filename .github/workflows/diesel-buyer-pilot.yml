@@ -14,7 +14,8 @@ on:
           - Iran
           - Iraq
           - Iran
-        default: Iran
+          - Iran + Iraq
+        default: Iran + Iraq
       target_new_leads:
         description: "Maximum genuinely new company records for this run"
         required: true
@@ -118,7 +119,14 @@ jobs:
           set -euo pipefail
           # Search only Tehran-refinery product families; exclude unrelated minerals and broad multi-fuel categories.
           python scripts/discover_tehran_refinery_buyers.py --limit 150 --output discovered_seeds.txt --social-output social_buyer_evidence.csv
-          python scripts/discover_osm_refinery_buyers.py --market "$MARKET" --output osm_seeds.txt --evidence osm_buyer_evidence.csv
+          if [[ "$MARKET" == "Iran + Iraq" ]]; then
+            python scripts/discover_osm_refinery_buyers.py --market Iran --output osm_iran_seeds.txt --evidence osm_iran_evidence.csv
+            python scripts/discover_osm_refinery_buyers.py --market Iraq --output osm_iraq_seeds.txt --evidence osm_iraq_evidence.csv
+            cat osm_iran_seeds.txt osm_iraq_seeds.txt > osm_seeds.txt
+            cat osm_iran_evidence.csv osm_iraq_evidence.csv > osm_buyer_evidence.csv
+          else
+            python scripts/discover_osm_refinery_buyers.py --market "$MARKET" --output osm_seeds.txt --evidence osm_buyer_evidence.csv
+          fi
           # Preserve relevance order: manual URLs first, refinery-specific discoveries second; no broad OSM industry seeds.
           python - <<'PY'
           from pathlib import Path
@@ -192,6 +200,8 @@ jobs:
             osm_seeds.txt
             social_buyer_evidence.csv
             osm_buyer_evidence.csv
+            osm_iran_evidence.csv
+            osm_iraq_evidence.csv
             diesel_seeds.txt
             diesel_leads.jsonl
           if-no-files-found: ignore
