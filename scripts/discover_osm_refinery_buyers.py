@@ -58,7 +58,7 @@ def main():
             print(f"OSM_DISCOVERY_WARNING market={market} error={type(exc).__name__}; continue without OSM")
     else:
         print(f"OSM_SKIPPED market={market!r}; unsupported country")
-    Path(a.output).write_text("\\n".join(urls)+("\\n" if urls else ""),encoding="utf-8")
+    Path(a.output).write_text("\n".join(urls)+("\n" if urls else ""),encoding="utf-8")
     with Path(a.evidence).open("w",newline="",encoding="utf-8-sig") as f:
         w=csv.writer(f); w.writerow(FIELDS); w.writerows(rows)
     return 0
