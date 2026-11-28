@@ -119,13 +119,13 @@ jobs:
           set -euo pipefail
           # Search only Tehran-refinery product families; exclude unrelated minerals and broad multi-fuel categories.
           python scripts/discover_tehran_refinery_buyers.py --limit 150 --output discovered_seeds.txt --social-output social_buyer_evidence.csv
-          : > osm_seeds.txt
+          python scripts/discover_osm_refinery_buyers.py --market "$MARKET" --output osm_seeds.txt --evidence osm_buyer_evidence.csv
           # Preserve relevance order: manual URLs first, refinery-specific discoveries second; no broad OSM industry seeds.
           python - <<'PY'
           from pathlib import Path
           from urllib.parse import urlsplit, urldefrag
           ordered, seen_urls, seen_domains = [], set(), set()
-          for name in ("manual_seeds.txt", "discovered_seeds.txt"):
+          for name in ("manual_seeds.txt", "discovered_seeds.txt", "osm_seeds.txt"):
               path = Path(name)
               if not path.exists():
                   continue
@@ -192,6 +192,7 @@ jobs:
             discovered_seeds.txt
             osm_seeds.txt
             social_buyer_evidence.csv
+            osm_buyer_evidence.csv
             diesel_seeds.txt
             diesel_leads.jsonl
           if-no-files-found: ignore
